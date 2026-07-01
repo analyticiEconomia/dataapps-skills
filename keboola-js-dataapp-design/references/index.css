@@ -1,0 +1,348 @@
+/* Copy this into `src/index.css`. Tailwind directives + design tokens +
+   every component class the two report modes rely on.
+
+   Requires tailwindcss configured with the tokens in tailwind.config —
+   see references/tailwind.config.md for the small shim.
+*/
+
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --brand-primary: #5B6CFF;
+  --brand-accent:  #8B5CF6;
+  --brand-success: #10B981;
+  --brand-warning: #F59E0B;
+  --brand-danger:  #EF4444;
+  --brand-muted:   #64748B;
+}
+
+body {
+  font-family: 'Inter', system-ui, sans-serif;
+  background: linear-gradient(135deg, #0F172A 0%, #1E293B 50%, #0F172A 100%);
+  color: #E2E8F0;
+  min-height: 100vh;
+}
+
+@layer components {
+  /* ------- Classic mode building blocks ------- */
+
+  .insight-card {
+    background: linear-gradient(135deg, rgba(91,108,255,0.1) 0%, rgba(139,92,246,0.1) 100%);
+    border: 1px solid rgba(91,108,255,0.3);
+    border-radius: 20px;
+    padding: 1.5rem;
+    margin-bottom: 1.25rem;
+    backdrop-filter: blur(10px);
+  }
+
+  .insight-headline {
+    font-family: 'Inter', sans-serif;
+    font-size: 1.25rem;
+    font-weight: 700;
+    color: #FFFFFF;
+    margin-bottom: 0.75rem;
+    line-height: 1.3;
+  }
+
+  .kpi-hero {
+    font-family: 'Inter', sans-serif;
+    font-size: 3.5rem;
+    font-weight: 800;
+    background: linear-gradient(135deg, #5B6CFF 0%, #8B5CF6 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    line-height: 1;
+    font-variant-numeric: tabular-nums;
+  }
+  .kpi-hero-success { background: linear-gradient(135deg, #10B981 0%, #34D399 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
+  .kpi-hero-warning { background: linear-gradient(135deg, #F59E0B 0%, #FBBF24 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
+  .kpi-hero-danger  { background: linear-gradient(135deg, #EF4444 0%, #F87171 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
+
+  .insight-meta {
+    margin-top: 1rem;
+    padding-top: 1rem;
+    border-top: 1px solid rgba(255,255,255,0.1);
+    font-size: 0.875rem;
+    color: #94A3B8;
+  }
+
+  .nav-item {
+    @apply flex items-center gap-3 px-4 py-3 text-sm font-medium text-slate-400 rounded-lg transition-colors hover:bg-slate-800/50 hover:text-slate-200;
+  }
+  .nav-item.active {
+    @apply bg-gradient-to-r from-brand-primary to-brand-accent text-white;
+  }
+
+  .data-table       { @apply w-full text-sm; }
+  .data-table th    { @apply px-3 py-2 text-left font-semibold text-slate-300 bg-slate-800/50 border-b border-slate-700 text-xs; }
+  .data-table td    { @apply px-3 py-2 border-b border-slate-700/50 text-slate-300 text-xs; }
+  .data-table tr:hover td { @apply bg-slate-800/30; }
+
+  .mini-kpi {
+    background: rgba(15, 23, 42, 0.6);
+    border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 12px;
+    padding: 1rem;
+  }
+  .mini-kpi-value { font-size: 1.5rem; font-weight: 700; color: #FFFFFF; font-variant-numeric: tabular-nums; }
+  .mini-kpi-label { font-size: 0.75rem; color: #94A3B8; margin-top: 0.25rem; }
+
+  /* ------- ChartExplainer wrapper ------- */
+
+  .chart-explainer {
+    background: rgba(15, 23, 42, 0.4);
+    border: 1px solid rgba(148,163,184,0.15);
+    border-radius: 16px;
+    padding: 1.25rem;
+    position: relative;
+  }
+  .chart-explainer-toggle {
+    position: absolute;
+    top: 1rem;
+    right: 1rem;
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    background: rgba(148,163,184,0.15);
+    border: 1px solid rgba(148,163,184,0.3);
+    color: #CBD5E1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.85rem;
+    cursor: pointer;
+    transition: all 200ms ease;
+  }
+  .chart-explainer-toggle:hover {
+    background: rgba(165,180,252,0.2);
+    color: white;
+    transform: scale(1.08);
+  }
+  .chart-explainer-panel {
+    margin-top: 1rem;
+    padding: 1rem 1.25rem;
+    background: rgba(15, 23, 42, 0.7);
+    border-left: 3px solid #A5B4FC;
+    border-radius: 8px;
+    font-size: 0.85rem;
+    color: #CBD5E1;
+    line-height: 1.6;
+  }
+  .chart-explainer-panel h5 {
+    font-size: 0.7rem;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    color: #A5B4FC;
+    margin-bottom: 0.35rem;
+    margin-top: 0.75rem;
+  }
+  .chart-explainer-panel h5:first-child { margin-top: 0; }
+  .chart-explainer-panel p { margin: 0 0 0.5rem 0; }
+
+  /* ------- Story mode ------- */
+
+  .story-body {
+    background:
+      radial-gradient(1200px 800px at 10% -10%, rgba(91,108,255,0.18), transparent 60%),
+      radial-gradient(1200px 800px at 90% 100%, rgba(139,92,246,0.18), transparent 60%),
+      linear-gradient(180deg, #050914 0%, #0A0F1E 100%);
+    min-height: 100vh;
+    font-feature-settings: "ss01", "cv11";
+  }
+
+  .story-hero-number {
+    font-family: 'Inter', sans-serif;
+    font-weight: 800;
+    font-size: clamp(4rem, 12vw, 10rem);
+    letter-spacing: -0.04em;
+    line-height: 0.9;
+    background: linear-gradient(135deg, #A5B4FC 0%, #C4B5FD 50%, #F5D0FE 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    font-variant-numeric: tabular-nums;
+  }
+  .story-hero-number.danger  { background: linear-gradient(135deg, #FCA5A5 0%, #F87171 50%, #FB923C 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
+  .story-hero-number.success { background: linear-gradient(135deg, #6EE7B7 0%, #34D399 50%, #10B981 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
+  .story-hero-number.warning { background: linear-gradient(135deg, #FCD34D 0%, #FBBF24 50%, #F59E0B 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
+
+  .story-title {
+    font-family: 'Inter', sans-serif;
+    font-weight: 800;
+    font-size: clamp(2rem, 5vw, 3.5rem);
+    letter-spacing: -0.03em;
+    line-height: 1.05;
+    color: #F8FAFC;
+  }
+  .story-eyebrow {
+    font-family: 'Inter', sans-serif;
+    font-weight: 600;
+    font-size: 0.75rem;
+    letter-spacing: 0.25em;
+    text-transform: uppercase;
+    color: #A5B4FC;
+  }
+  .story-lead {
+    font-size: clamp(1.05rem, 1.35vw, 1.35rem);
+    line-height: 1.55;
+    color: #CBD5E1;
+    max-width: 62ch;
+  }
+  .story-caption { font-size: 0.8rem; color: #64748B; letter-spacing: 0.02em; }
+
+  .story-callout,
+  .story-callout-danger,
+  .story-callout-success {
+    border: 1px solid rgba(148,163,184,0.15);
+    border-radius: 20px;
+    padding: 1.75rem;
+    backdrop-filter: blur(14px);
+  }
+  .story-callout         { background: linear-gradient(135deg, rgba(91,108,255,0.12) 0%, rgba(139,92,246,0.10) 100%); }
+  .story-callout-danger  { background: linear-gradient(135deg, rgba(239,68,68,0.12) 0%, rgba(251,146,60,0.10) 100%); border-color: rgba(251,113,133,0.25); }
+  .story-callout-success { background: linear-gradient(135deg, rgba(16,185,129,0.12) 0%, rgba(52,211,153,0.10) 100%); border-color: rgba(52,211,153,0.25); }
+
+  /* fade-in on IntersectionObserver */
+  .story-fade {
+    opacity: 0;
+    transform: translateY(24px);
+    transition: opacity 700ms cubic-bezier(0.22, 1, 0.36, 1),
+                transform 700ms cubic-bezier(0.22, 1, 0.36, 1);
+    will-change: opacity, transform;
+  }
+  .story-fade.visible { opacity: 1; transform: translateY(0); }
+  .story-fade[data-delay="1"] { transition-delay: 100ms; }
+  .story-fade[data-delay="2"] { transition-delay: 220ms; }
+  .story-fade[data-delay="3"] { transition-delay: 360ms; }
+  .story-fade[data-delay="4"] { transition-delay: 500ms; }
+  .story-fade[data-delay="5"] { transition-delay: 640ms; }
+
+  /* right-side chapter progress */
+  .story-progress {
+    position: fixed;
+    right: 2rem;
+    top: 50%;
+    transform: translateY(-50%);
+    display: flex;
+    flex-direction: column;
+    gap: 0.9rem;
+    z-index: 40;
+  }
+  .story-progress-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: rgba(148,163,184,0.25);
+    transition: all 300ms ease;
+    cursor: pointer;
+    position: relative;
+  }
+  .story-progress-dot:hover      { background: rgba(148,163,184,0.6); transform: scale(1.3); }
+  .story-progress-dot.active     { background: #A5B4FC; box-shadow: 0 0 0 4px rgba(165,180,252,0.15); transform: scale(1.2); }
+  .story-progress-label {
+    position: absolute;
+    right: 20px;
+    top: 50%;
+    transform: translateY(-50%);
+    white-space: nowrap;
+    font-size: 0.7rem;
+    color: #94A3B8;
+    opacity: 0;
+    transition: opacity 200ms ease;
+    pointer-events: none;
+    background: rgba(15,23,42,0.9);
+    padding: 4px 10px;
+    border-radius: 6px;
+    border: 1px solid rgba(148,163,184,0.15);
+  }
+  .story-progress-dot:hover .story-progress-label { opacity: 1; }
+
+  .story-scroll-hint {
+    position: absolute;
+    bottom: 3rem;
+    left: 50%;
+    transform: translateX(-50%);
+    color: #64748B;
+    font-size: 0.75rem;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    animation: story-bounce 2.4s infinite ease-in-out;
+    text-align: center;
+  }
+  @keyframes story-bounce {
+    0%, 100% { transform: translate(-50%, 0); opacity: 0.7; }
+    50%      { transform: translate(-50%, 8px); opacity: 1; }
+  }
+
+  .story-mode-switcher {
+    position: fixed;
+    top: 1.25rem;
+    right: 1.25rem;
+    z-index: 50;
+    background: rgba(15,23,42,0.75);
+    backdrop-filter: blur(12px);
+    border: 1px solid rgba(148,163,184,0.2);
+    border-radius: 999px;
+    padding: 0.4rem 0.9rem;
+    color: #CBD5E1;
+    font-size: 0.75rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 200ms ease;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+  .story-mode-switcher:hover { color: white; border-color: rgba(165,180,252,0.5); }
+
+  /* ------- Mode selector landing ------- */
+
+  .mode-select-body {
+    background:
+      radial-gradient(800px 600px at 30% 20%, rgba(91,108,255,0.25), transparent 55%),
+      radial-gradient(700px 500px at 70% 80%, rgba(139,92,246,0.20), transparent 55%),
+      linear-gradient(180deg, #050914 0%, #0A0F1E 100%);
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 2rem;
+  }
+  .mode-card {
+    background: rgba(15,23,42,0.6);
+    border: 1px solid rgba(148,163,184,0.2);
+    border-radius: 24px;
+    padding: 2.5rem 2rem;
+    backdrop-filter: blur(14px);
+    cursor: pointer;
+    transition: all 300ms cubic-bezier(0.22, 1, 0.36, 1);
+    position: relative;
+    overflow: hidden;
+  }
+  .mode-card:hover {
+    transform: translateY(-4px);
+    border-color: rgba(165,180,252,0.5);
+    box-shadow: 0 24px 60px -12px rgba(91,108,255,0.35);
+  }
+  .mode-card-icon {
+    width: 56px;
+    height: 56px;
+    border-radius: 16px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: 1.25rem;
+    background: linear-gradient(135deg, #5B6CFF 0%, #8B5CF6 100%);
+    box-shadow: 0 10px 30px -8px rgba(91,108,255,0.5);
+  }
+
+  /* ------- Recharts adjustments ------- */
+
+  .recharts-cartesian-axis-tick text,
+  .recharts-tooltip-item-name { font-family: 'Inter', sans-serif; }
+}
