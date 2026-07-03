@@ -39,12 +39,17 @@ Everything you need to run `npm install && npm run build && node dist/server/ind
 
 ## `package.json`
 
+Do NOT add `"type": "module"`. `tsconfig.server.json` compiles the server to CommonJS
+(`module: "CommonJS"`); if the package is ESM-typed, Node treats the compiled
+`dist/server/*.js` as ES modules and crashes on boot with
+`ReferenceError: exports is not defined in ES module scope`. Keep `tailwind.config.js` and
+`postcss.config.js` as `module.exports` (not `export default`) to match — see pitfalls.md §21.
+
 ```json
 {
   "name": "keboola-dataapp",
   "version": "0.0.1",
   "private": true,
-  "type": "module",
   "scripts": {
     "dev:client": "vite",
     "dev:server": "tsx watch server/index.ts",
@@ -168,13 +173,14 @@ export default defineConfig(({ command }) => ({
 ## `tailwind.config.js`
 
 ```js
-export default {
+module.exports = {
   content: ['./index.html', './src/**/*.{ts,tsx}'],
   theme: {
     extend: {
       colors: {
         brand: {
           primary: '#5B6CFF',
+          accent:  '#8B5CF6', // matches --brand-accent in the design skill's index.css
           purple:  '#8B5CF6',
           success: '#10B981',
           warning: '#F59E0B',
@@ -191,7 +197,7 @@ export default {
 ## `postcss.config.js`
 
 ```js
-export default {
+module.exports = {
   plugins: { tailwindcss: {}, autoprefixer: {} },
 };
 ```

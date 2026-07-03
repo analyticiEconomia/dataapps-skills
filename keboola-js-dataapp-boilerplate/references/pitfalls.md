@@ -256,6 +256,44 @@ Users report "the app takes 20 seconds to load" — the container was suspended 
 
 The Kai HTTP API has only ONE endpoint that matters for chat: `POST /api/chat`. Skip fallback to `/chat` or `/v1/chat` — they don't exist. If you get 404, the discovered base URL is wrong (region mismatch), not the path.
 
+## 21. `"type": "module"` in package.json crashes the compiled server on boot
+
+**Symptom:** container starts, immediately exits, supervisord gives up after a few retries.
+Startup logs show:
+
+```
+ReferenceError: exports is not defined in ES module scope
+This file is being treated as an ES module because it has a '.js' file extension and
+'/app/package.json' contains "type": "module". To treat it as a CommonJS script, rename it
+to use the '.cjs' file extension.
+    at file:///app/dist/server/index.js:5:23
+```
+
+**Root cause:** `tsconfig.server.json` compiles `server/*.ts` to CommonJS
+(`module: "CommonJS"`, using `exports.foo = …`). If `package.json` also declares
+`"type": "module"`, Node treats every `.js` file — including the compiled
+`dist/server/index.js` — as an ES module regardless of its actual syntax, and CommonJS's
+`exports` object doesn't exist in that scope.
+
+**Fix:** don't set `"type": "module"` in `package.json` at all. The frontend build (Vite)
+doesn't need it — Vite bundles and serves the browser build independently of Node's module
+resolution. Keep `tailwind.config.js` and `postcss.config.js` as `module.exports = {...}`
+(not `export default`) to match; otherwise Node prints a
+`[MODULE_TYPELESS_PACKAGE_JSON]` reparse warning for them (harmless, but noisy).
+
+## 22. Tailwind colors referenced in the design skill's CSS but missing from `tailwind.config.js`
+
+**Symptom:** `npm run build` fails with `[postcss] The 'to-brand-accent' class does not exist`
+(or any other `brand-*` class) even though `tailwind.config.js` was copied from this skill.
+
+**Root cause:** the design skill's `index.css` (`.nav-item.active`) uses
+`from-brand-primary to-brand-accent`, but this skill's `tailwind.config.js` template only
+defined `brand.purple`, not `brand.accent` — same hex value, different key.
+
+**Fix:** the template now includes both `accent` and `purple` keys (identical value) so either
+naming works. If you hand-roll the Tailwind config instead of copying the template, define
+`brand.accent` explicitly.
+
 ## 20. The `MULTI_LINE_ITEMS_DOCS`-style 10 000 exactly
 
 Any table showing exactly a round number like 10 000, 50 000, 100 000 is almost certainly `LIMIT`ed at that number in the producer transformation. Verify by running `SELECT COUNT(*) FROM …` against the underlying source, not against the pre-agg. If the source has more rows, the pre-agg is a truncated sample and any distribution derived from it is distorted (top-N by whatever the `ORDER BY` prioritizes).

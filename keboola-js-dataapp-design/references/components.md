@@ -288,10 +288,14 @@ export function formatPct(n: unknown): string {
 
 ## Recharts theme
 
-Always pass this style pattern to `<Tooltip>`:
+Always pass this style pattern to `<Tooltip>`. `contentStyle` alone is not enough — Recharts'
+default tooltip text color is black, which is unreadable against the dark `contentStyle`
+background. Explicitly set `itemStyle` and `labelStyle` too:
 
 ```tsx
 contentStyle={{ background: '#0F172A', border: '1px solid #334155', borderRadius: 12 }}
+itemStyle={{ color: '#E2E8F0' }}
+labelStyle={{ color: '#E2E8F0' }}
 ```
 
 Colors:
