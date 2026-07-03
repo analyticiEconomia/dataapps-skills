@@ -294,6 +294,30 @@ defined `brand.purple`, not `brand.accent` — same hex value, different key.
 naming works. If you hand-roll the Tailwind config instead of copying the template, define
 `brand.accent` explicitly.
 
+## 23. SQL `BOOLEAN` columns arrive as the strings `"true"`/`"false"`, not JS booleans
+
+**Symptom:** a client-side filter like `if (status === 'active' && row.IS_DELETED) return false`
+excludes every row regardless of the row's actual value — a status filter that always returns
+nothing, or a badge that always renders.
+
+**Root cause:** the Snowflake Query Service results endpoint (used by `runSnowflakeQuery` in
+`kbcQuery.ts`) returns every cell as a string, including SQL `BOOLEAN`/`CASE…THEN TRUE ELSE
+FALSE END` columns. The string `"false"` is truthy in JavaScript, so any code that treats the
+field as a real boolean (`if (row.IS_DELETED)`, `row.IS_DELETED && …`) behaves as if it were
+always `true`.
+
+**Fix:** never branch on a boolean-typed column directly. Add a small coercion helper and use it
+everywhere the column is read, both for filtering and for conditional rendering:
+
+```ts
+function isTrue(v: unknown): boolean {
+  return v === true || v === 'true';
+}
+```
+
+Type the field as `boolean | string` in your TS interfaces (not `boolean`) as a reminder that the
+runtime value isn't a real boolean.
+
 ## 20. The `MULTI_LINE_ITEMS_DOCS`-style 10 000 exactly
 
 Any table showing exactly a round number like 10 000, 50 000, 100 000 is almost certainly `LIMIT`ed at that number in the producer transformation. Verify by running `SELECT COUNT(*) FROM …` against the underlying source, not against the pre-agg. If the source has more rows, the pre-agg is a truncated sample and any distribution derived from it is distorted (top-N by whatever the `ORDER BY` prioritizes).
