@@ -318,6 +318,33 @@ function isTrue(v: unknown): boolean {
 Type the field as `boolean | string` in your TS interfaces (not `boolean`) as a reminder that the
 runtime value isn't a real boolean.
 
+## 24. Time-series chart X-axis renders out of chronological order
+
+**Symptom:** a line/area/bar chart over dates or week labels ("W01", "W02"…) zig-zags instead of
+trending left-to-right, even though the producing SQL had an `ORDER BY`.
+
+**Root cause:** row order from `queryTable()`/the Snowflake results endpoint is not a contract —
+it can be preserved end-to-end today and silently lost tomorrow (a client-side filter/slice
+re-orders the array, `Array.from(new Set(...))` preserves insertion order not sort order, etc).
+Relying on "the SQL already sorted it" is fragile because the sort guarantee lives far from the
+chart code that assumes it.
+
+Week-label strings compound this: `["W1", "W10", "W2"]` sorts alphabetically before numeric
+sort, e.g. `Array.from(new Set(weekLabels)).sort()` puts `W10` between `W1` and `W2`.
+
+**Fix:** always sort chart data explicitly, client-side, right before rendering — never assume
+upstream order:
+
+```ts
+const trend = rows
+  .map((r) => ({ date: r.RUN_DATE, value: Number(r.VALUE) || 0 }))
+  .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+
+const weeks = Array.from(new Set(rows.map((r) => r.WEEK_LABEL))).sort(
+  (a, b) => parseInt(a.replace('W', ''), 10) - parseInt(b.replace('W', ''), 10),
+);
+```
+
 ## 20. The `MULTI_LINE_ITEMS_DOCS`-style 10 000 exactly
 
 Any table showing exactly a round number like 10 000, 50 000, 100 000 is almost certainly `LIMIT`ed at that number in the producer transformation. Verify by running `SELECT COUNT(*) FROM …` against the underlying source, not against the pre-agg. If the source has more rows, the pre-agg is a truncated sample and any distribution derived from it is distorted (top-N by whatever the `ORDER BY` prioritizes).
