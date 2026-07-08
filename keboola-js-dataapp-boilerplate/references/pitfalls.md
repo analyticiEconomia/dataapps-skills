@@ -220,7 +220,7 @@ TRY_PARSE_JSON("dpmInfo"):"variableSymbol"::string AS vs
 **Symptom:** you pushed a fix minutes ago, opened the app URL, and it still shows the old bug.
 
 **Root cause:** Keboola pulls the git repo on **container start**, not on push. A running container serves cached code until:
-- 15-minute auto-suspend timer elapses (default `autoSuspendAfterSeconds: 900`), then next request pulls fresh code
+- auto-suspend timer elapses (default `autoSuspendAfterSeconds: 300` — 5 minutes, per the platform's own deploy defaults; do not assume 900/15-min, confirm in the app's Advanced Settings), then next request pulls fresh code
 - OR you click **Redeploy** in the app config UI
 - OR you call `mcp__<project>__deploy_data_app` with the config ID
 
@@ -250,7 +250,7 @@ Some Vite scaffolds don't ship the `import.meta.env` type in every scope. Guard 
 
 ## 18. Auto-suspend suspends without warning
 
-Users report "the app takes 20 seconds to load" — the container was suspended and the first request has to spin it up. This is by design (`autoSuspendAfterSeconds: 900`). For a demo before a board meeting, warm the app 2 minutes before the meeting starts by opening its URL.
+Users report "the app takes 20 seconds to load" — the container was suspended and the first request has to spin it up. This is by design (`autoSuspendAfterSeconds: 300` by default — 5 minutes). For a demo before a board meeting, warm the app 2 minutes before the meeting starts by opening its URL.
 
 ## 19. Node HTTP endpoint is always `/api/chat`
 

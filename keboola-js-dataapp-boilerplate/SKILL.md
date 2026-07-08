@@ -48,6 +48,8 @@ Ready-to-copy templates live in `references/`:
 
 ## The workflow
 
+> **Local preference (Pavel / wflow):** deploy **straight to production** — skip the draft → dev-preview → approve → merge dance. The dev-preview draft sits behind basic-auth on a separate URL and is a pain to actually view, so it adds friction with no value here. For a new app: create the prod app, clone its managed repo, push code to `main`, `deploy_data_app(configuration_id=PROD)` (no `mode`). For edits: push `main`, redeploy prod. (Deploying still needs Pavel's explicit OK before you run it.)
+
 ### Step 1 — Provision the data app in Keboola
 
 Use `mcp__<project>__create_config` (or `create_python_js_data_app_git_credential`) to create the data app configuration:
@@ -108,7 +110,7 @@ git commit -m "Initial release"
 git push origin main
 ```
 
-Keboola pulls the code on next container start. **A push does not auto-restart a running container** — the current container serves cached code until it hits the 15-min auto-suspend timeout, or until you click Redeploy in the UI. See `references/pitfalls.md` §14.
+Keboola pulls the code on next container start. **A push does not auto-restart a running container** — the current container serves cached code until it hits the auto-suspend timeout (default `autoSuspendAfterSeconds: 300`, 5 minutes — confirm in the app's Advanced Settings, don't assume 15 min), or until you click Redeploy in the UI. See `references/pitfalls.md` §14.
 
 ## Pre-flight checklist
 
