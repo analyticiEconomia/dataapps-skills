@@ -255,6 +255,12 @@ export function DataTable({ data, columns, filename, maxRows = 25 }: {
 
 ## Number formatters
 
+> **Locale + currency must match the app's audience, not the author.** These
+> defaults are `cs-CZ` / `Kč` for Czech-facing apps. For an English/US app (or any
+> other audience) swap the locale to `en-US` and the currency to the right symbol —
+> otherwise you ship "8 477 842" and "Kč" to people who expect "8,477,842" and "$".
+> Set it once as a constant (`const LOCALE = 'en-US'`) and thread it through.
+
 ```tsx
 export function formatNumber(n: unknown): string {
   const num = Number(n);

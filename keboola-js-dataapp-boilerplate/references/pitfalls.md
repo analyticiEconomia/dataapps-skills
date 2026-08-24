@@ -348,3 +348,66 @@ const weeks = Array.from(new Set(rows.map((r) => r.WEEK_LABEL))).sort(
 ## 20. The `MULTI_LINE_ITEMS_DOCS`-style 10 000 exactly
 
 Any table showing exactly a round number like 10 000, 50 000, 100 000 is almost certainly `LIMIT`ed at that number in the producer transformation. Verify by running `SELECT COUNT(*) FROM …` against the underlying source, not against the pre-agg. If the source has more rows, the pre-agg is a truncated sample and any distribution derived from it is distorted (top-N by whatever the `ORDER BY` prioritizes).
+
+## 25. Filter selections sent over a GET query string → 431 Request Header Fields Too Large
+
+**Symptom:** a dynamic-filter tab renders its controls fine, then the data call fails with `431`. The failing request is a GET like `/api/total-searches?f=<huge JSON>`.
+
+**Root cause:** you serialised the current filter selection into the URL, and one dimension ("division", "city", "SKU"…) has **thousands of values all selected by default**. The query string blows past the server/proxy header-size limit. This only bites dynamic-filter apps — the read-once `/api/data/all` model never sends filters.
+
+**Fix (two parts):**
+
+**a) Use POST, not GET, for filter-heavy endpoints.** Send the filter object as a JSON body — bodies have no header-size limit. A small `usePost()` hook mirrors `useFetch()` but posts and re-runs when `url + JSON.stringify(body)` changes.
+
+**b) Send a fully-selected dimension as `null` = "no filter".** Don't ship 3 000 division names when the user hasn't narrowed anything. On the client, compact each dimension: `sel.length === all.length ? null : sel`. On the server, distinguish three cases:
+
+```ts
+// null  => fully selected ("All") => NO clause (and no giant IN list in the SQL)
+// []    => nothing selected       => 1=0 (empty result)
+// [...] => IN (...) for the subset
+function whereIn(col: string, values: string[] | null): string | null {
+  return values === null ? null : sqlIn(col, values); // sqlIn([]) === '1=0'
+}
+```
+
+This also makes the SQL faster — no thousands-element `IN` clause when a dimension isn't narrowed.
+
+## 26. `vite build` does NOT type-check the frontend
+
+**Symptom:** the build is green but the app has type errors (wrong prop types, missing fields) that only surface as runtime bugs.
+
+**Root cause:** Vite compiles TS with esbuild, which **strips types without checking them**. `npm run build` (`vite build && tsc -p tsconfig.server.json`) only type-checks the *server*.
+
+**Fix:** run `npx tsc --noEmit` (the `typecheck` script) on the frontend before shipping, and treat it as part of "build passes". CI should run both.
+
+## 27. `get_data_apps` detail can exceed the tool's token limit
+
+**Symptom:** fetching an existing app's config to port or inspect it returns "result exceeds maximum allowed tokens" — the Streamlit `parameters.script` alone can be 50–60 KB.
+
+**Fix:** the tool saves the full JSON to a file and prints the path. Don't retry the tool; instead extract what you need from that file, e.g.:
+
+```bash
+python -c "import json;d=json.load(open('<file>',encoding='utf-8'));a=d['data_apps'][0];\
+open('app.py','w',encoding='utf-8').write('\n'.join(a['configuration']['parameters']['script']) \
+if isinstance(a['configuration']['parameters']['script'],list) else a['configuration']['parameters']['script'])"
+```
+
+Then read `app.py` locally. `parameters.script` is a one-element list-of-string on some apps and a plain string on others — handle both.
+
+## 29. Restricting an app to a Google Group ("only members of X can see this report")
+
+Full pattern in a separate reference file: `references/google-group-access.md`. Short version:
+use the **Cloud Identity Groups API** (service account just needs Owner/Manager on the target
+Google Group — no domain-wide delegation, no impersonation, no Workspace admin role needed), and
+**always exempt Kubernetes health-check paths** from the gate middleware or the deploy will die
+with `StartupDeadlineExceeded` on the very first try.
+
+## 28. Iterating tweak-by-tweak makes every change feel like 5-15 minutes
+
+**Symptom:** a design-review session ("let's walk through each tab and fix what looks off") where every single small CSS/copy fix feels like it takes minutes, even though no individual command is slow.
+
+**Root cause — two independent factors, don't conflate them:**
+
+**(a) Prod has no hot-reload path.** Every `deploy_data_app` call on a prod (non-draft) config re-clones, re-installs (no cache between deploys), and rebuilds from scratch — genuinely ~20-40s — then you poll `starting` a few times before it's `running`. A draft deployed once in dev mode (`mode='dev'`) avoids this: push a tweak to its branch and the container's `git-watcher` + Vite HMR + `tsx watch` hot-reload in place, no `deploy_data_app` call needed, ~1-3s per tweak instead of ~20-40s. **This is a real option, but only take it if the user wants it** — some explicitly prefer every tweak live on the one real prod URL and find a second draft URL/branch more confusing than the rebuild cost is worth. Ask once, then respect the answer; don't re-relitigate it every time a rebuild feels slow.
+
+**(b) Round-trip/reasoning overhead per tool call — this one bites you on EITHER path (draft or prod).** In a long agent session, each separate tool call costs a full reasoning pass, and those passes get slower as the conversation's accumulated context grows. Doing "edit file → edit file → typecheck → build → git add → git commit → git push" as 6-7 separate tool calls, each with reasoning in between, can add up to minutes of wall-clock time even though every individual command is a few seconds. This is usually the bigger, easier-to-miss cost of the two. **Fix: batch.** Do all the edits, then run typecheck + build + `git add`/`commit`/`push` as one shell invocation. Don't pause to narrate or re-confirm between micro-steps of an already-approved change — save the pause for the actual deploy/run permission gate.
