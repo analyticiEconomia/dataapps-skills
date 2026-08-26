@@ -69,6 +69,20 @@ async function isGroupMember(email: string, group: string): Promise<boolean> {
   return isMember;
 }
 
+// Supports multiple independent groups on the same report (OR logic — member
+// of ANY listed group passes) without nesting one group inside another.
+// If every single group check errors (e.g. API outage), surface that as an
+// error rather than silently treating it as "not a member".
+async function isMemberOfAnyGroup(email: string, groups: string[]): Promise<boolean> {
+  const results = await Promise.allSettled(groups.map((g) => isGroupMember(email, g)));
+  const anyFulfilled = results.some((r) => r.status === 'fulfilled');
+  if (!anyFulfilled) {
+    const firstRejected = results.find((r): r is PromiseRejectedResult => r.status === 'rejected');
+    throw firstRejected ? firstRejected.reason : new Error('All group membership checks failed');
+  }
+  return results.some((r) => r.status === 'fulfilled' && r.value === true);
+}
+
 function accessDeniedPage(reason: string): string {
   const esc = (s: string) => s.replace(/[&<>"']/g, (c) => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]!));
   return `<!doctype html><html lang="cs"><head><meta charset="utf-8"><title>Přístup odepřen</title></head>
@@ -83,17 +97,19 @@ function accessDeniedPage(reason: string): string {
 // is unset, so this is safe to leave in shared boilerplate even for apps that don't gate.
 app.use(async (req, res, next) => {
   if (isHealthCheck(req)) return next(); // CRITICAL — see SKILL.md Gotcha 3
-  const allowedGroup = process.env.REQUIRED_GROUP_EMAIL;
-  if (!allowedGroup) return next();
+  const allowedGroupsRaw = process.env.REQUIRED_GROUP_EMAIL;
+  if (!allowedGroupsRaw) return next();
+  // Comma-separated for multi-group access, e.g. "dataapps_product@economia.cz,dataapps_yield@economia.cz"
+  const allowedGroups = allowedGroupsRaw.split(',').map((g) => g.trim()).filter(Boolean);
   const email = getUserEmail(req);
   if (!email) {
     res.status(403).send(accessDeniedPage('Nepodařilo se ověřit přihlášeného uživatele. Zkuste se prosím přihlásit znovu.'));
     return;
   }
   try {
-    const member = await isGroupMember(email, allowedGroup);
+    const member = await isMemberOfAnyGroup(email, allowedGroups);
     if (!member) {
-      res.status(403).send(accessDeniedPage(`Tento report je dostupný jen pro členy skupiny ${allowedGroup}.`));
+      res.status(403).send(accessDeniedPage(`Tento report je dostupný jen pro členy skupiny ${allowedGroups.join(' / ')}.`));
       return;
     }
   } catch (err) {

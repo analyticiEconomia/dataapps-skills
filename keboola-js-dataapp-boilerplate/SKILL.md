@@ -87,6 +87,7 @@ Use `mcp__<project>__create_config` (or `create_python_js_data_app_git_credentia
 - `slug`: kebab-case, appears in the deployment URL
 - `runtime.workspace.enabled`: `true` (required for Snowflake queries from the container)
 - `authorization.app_proxy.auth_rules`: `[{type: "pathPrefix", value: "/", auth_required: false}]` for public apps
+- `storage.input.tables`: list **every** source table the app will ever query (all pre-agg tables from Step 4, plus any others), even though the app queries them directly through the workspace connection rather than through a mounted file. Don't leave this to "whatever the workspace happens to already see" — declare it explicitly, and keep it in sync whenever a new table is wired in (Step 5). An undeclared table can work fine in ad-hoc testing and then fail unpredictably once permissions/workspace scoping are enforced properly.
 
 Result: Keboola provisions a private git repo at `git.<region>.keboola.com/keboola/app-<data_app_id>.git` and returns credentials. Save the credentials — you'll use them for `git clone`.
 
@@ -122,6 +123,8 @@ See `references/data-flow.md` for the full pre-agg pattern and `references/pitfa
 
 In `server/index.ts`, add each pre-agg table to the parallel `queryTable(...)` fan-out and mirror it in the JSON response. In `src/App.tsx`, extend the `DataResponse` interface to match. `useFetch` in `hooks/` handles the request + loading/error state.
 
+Every table added here must also be added to `storage.input.tables` in the app's config (see Step 1) — do both in the same change, not as a follow-up.
+
 ### Step 6 — Design pass
 
 Now (not before) apply `keboola-js-dataapp-design`:
@@ -146,6 +149,7 @@ Before opening a PR / calling the app finished:
 
 - [ ] `STORAGE_API_TOKEN` secret set in Advanced Settings (Kai without it → 500 with instructional error)
 - [ ] Every pre-agg table exists in `storage.output.tables` (workspace-only tables silently disappear)
+- [ ] Every table the app queries is also declared in the app's own `storage.input.tables` (Step 1 + Step 5) — not just implicitly reachable through the workspace connection
 - [ ] Every table with hero-KPI-count usage has that count exposed as a KPI column, NOT computed from `table.length`
 - [ ] Every `LIMIT N` in transformation SQL is documented in `data-flow.md` — and if the true count matters, a `COUNT(*)` column exists in the KPI row
 - [ ] `pageSize` in `queryTable` is at least 50 000 (default 10 000 silently truncates larger tables)

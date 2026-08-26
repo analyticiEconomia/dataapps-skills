@@ -117,7 +117,7 @@ Client ID and Client Secret from the 1Password entry.
 | Name | Value |
 |---|---|
 | `GOOGLE_SERVICE_ACCOUNT_KEY` | the **entire** service account JSON file content (not just `private_key`), from 1Password |
-| `REQUIRED_GROUP_EMAIL` | the target group's email, e.g. `dataapps_product@economia.cz` |
+| `REQUIRED_GROUP_EMAIL` | the target group's email, e.g. `dataapps_product@economia.cz`. For more than one group, comma-separate them — see "Multiple groups on one report" below |
 
 Use exactly these two names — see Gotcha 2. Note: these have to be added by
 hand through the Keboola UI; `update_config` via MCP is hard-blocked for
@@ -153,6 +153,37 @@ picks it up on next container start / manual redeploy).
 
 Use a fresh browser session or incognito window — **not** an embedded
 Electron browser (e.g. Claude desktop's preview) — see Gotcha 5.
+
+## Multiple groups on one report
+
+Need e.g. both `dataapps_product@economia.cz` and `dataapps_yield@economia.cz`
+to see the same report, without creating a merged group for it? Two options:
+
+**A) Multi-group env var (recommended default).** Set `REQUIRED_GROUP_EMAIL`
+to a comma-separated list:
+
+```
+dataapps_product@economia.cz,dataapps_yield@economia.cz
+```
+
+`references/middleware.ts` already implements this — `isMemberOfAnyGroup()`
+checks every listed group and passes if the user is a member of **any one**
+of them. The two groups stay fully independent; this only affects this one
+app. Preferred whenever the groups should keep meaning different things
+elsewhere.
+
+**B) Nest one group inside the other (zero code change).** In Google Groups,
+add one existing group as a *member* of the other (e.g. add
+`dataapps_yield@economia.cz` as a member of `dataapps_product@economia.cz`).
+Because the middleware calls `checkTransitiveMembership`, nested membership
+resolves automatically — no env var or code change needed on the app.
+**Caveat:** this permanently merges the two groups' access everywhere they're
+each already used to gate other reports, not just this one — e.g. if
+`dataapps_product` also gates a different, Product-only report, Yield members
+now see that one too. Only do this if that side effect is actually fine (or
+the two groups aren't used to gate anything else).
+
+Default to (A) unless you specifically want the groups permanently merged.
 
 ## Gotchas
 
