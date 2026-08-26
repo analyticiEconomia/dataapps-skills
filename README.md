@@ -2,7 +2,7 @@
 
 Claude Code skills for building **Keboola JS data apps** — React + Vite + TypeScript apps with an Express backend, Kai chat integration, and a two-mode UI (Classic tabbed report + Story-mode narrative).
 
-Both skills are generic and reusable across any Keboola project and domain.
+`boilerplate` and `design` are generic and reusable across any Keboola project and domain. `economia-dataapp-google-group-access` is Economia-specific (org contacts, 1Password entry names).
 
 ## What's inside
 
@@ -31,6 +31,14 @@ Visual system: two report modes with a first-load selector, mandatory Documentat
 - `references/chart-explainer.md` — good/bad copy examples for the chart explainers
 - `references/required-pages.md` — Documentation (first tab) + Ask Kai (last tab) templates
 - `references/copy-guide.md` — voice, tone, terminology template (per-app glossary)
+
+### [`economia-dataapp-google-group-access/`](./economia-dataapp-google-group-access)
+
+Add-on: gate an already-built data app behind Google SSO + a specific Google Group, on top of the boilerplate above. Economia-specific (shared credentials in 1Password "Keboola JS Apps Auth", IT contact, group-naming convention).
+
+- `SKILL.md` — per-app checklist: pick/request the Google Group, wire the OAuth redirect URI, add secrets, drop in the middleware
+- `references/middleware.ts` — Express gate using the Cloud Identity Groups API (no domain-wide delegation needed)
+- `references/group-request-email.md` — email template for Economia IT (new group and/or new OAuth redirect URI)
 
 ## Installation
 
