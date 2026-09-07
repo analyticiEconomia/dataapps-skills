@@ -11,6 +11,7 @@ Everything you need to run `npm install && npm run build && node dist/server/ind
 ├── tsconfig.json                # frontend
 ├── tsconfig.server.json         # backend
 ├── vite.config.ts
+├── esbuild.server.js            # bundles server/index.ts into dist/server/index.js
 ├── tailwind.config.js
 ├── postcss.config.js
 ├── index.html                   # Vite entry
@@ -39,11 +40,20 @@ Everything you need to run `npm install && npm run build && node dist/server/ind
 
 ## `package.json`
 
-Do NOT add `"type": "module"`. `tsconfig.server.json` compiles the server to CommonJS
-(`module: "CommonJS"`); if the package is ESM-typed, Node treats the compiled
-`dist/server/*.js` as ES modules and crashes on boot with
+Do NOT add `"type": "module"`. `esbuild.server.js` bundles the server to CommonJS
+(`format: "cjs"`); if the package is ESM-typed, Node treats the compiled
+`dist/server/index.js` as an ES module and crashes on boot with
 `ReferenceError: exports is not defined in ES module scope`. Keep `tailwind.config.js` and
 `postcss.config.js` as `module.exports` (not `export default`) to match — see pitfalls.md §21.
+
+The `build` script bundles the server with esbuild into ONE self-contained
+`dist/server/index.js` (express + all server-side deps inlined, no runtime
+`node_modules` needed) instead of just transpiling it with `tsc` — this is what
+lets `keboola-config/setup.sh` skip `npm install`/`npm run build` entirely on the
+PROD container. `tsc -p tsconfig.server.json --noEmit` still runs in the same
+build step purely for type-checking (esbuild transpiles but does not type-check).
+See pitfalls.md §30 for why this exists and what breaks if you go back to a plain
+`tsc`-compiled `dist/server/` that expects `node_modules` at runtime.
 
 ```json
 {
@@ -54,7 +64,7 @@ Do NOT add `"type": "module"`. `tsconfig.server.json` compiles the server to Com
     "dev:client": "vite",
     "dev:server": "tsx watch server/index.ts",
     "dev": "concurrently -k \"npm:dev:server\" \"npm:dev:client\"",
-    "build": "vite build && tsc -p tsconfig.server.json",
+    "build": "vite build && tsc -p tsconfig.server.json --noEmit && node esbuild.server.js",
     "start": "node dist/server/index.js",
     "typecheck": "tsc --noEmit"
   },
@@ -73,6 +83,7 @@ Do NOT add `"type": "module"`. `tsconfig.server.json` compiles the server to Com
     "@vitejs/plugin-react": "^4.3.3",
     "autoprefixer": "^10.4.20",
     "concurrently": "^9.0.1",
+    "esbuild": "^0.28.2",
     "postcss": "^8.4.47",
     "tailwindcss": "^3.4.14",
     "tsx": "^4.19.1",
@@ -81,6 +92,11 @@ Do NOT add `"type": "module"`. `tsconfig.server.json` compiles the server to Com
   }
 }
 ```
+
+Add `google-auth-library`, `googleapis`, or any other server-only package to
+`dependencies` as needed (e.g. for `google-group-access.md`) — esbuild bundles
+whatever `server/index.ts` actually imports, so new server deps need no other
+wiring beyond `npm install` before the next build.
 
 ## `tsconfig.json` (frontend)
 
@@ -106,6 +122,11 @@ Do NOT add `"type": "module"`. `tsconfig.server.json` compiles the server to Com
 
 ## `tsconfig.server.json` (backend)
 
+Used with `--noEmit` for type-checking only now — esbuild does the actual
+compile+bundle (see `esbuild.server.js` below). `outDir`/`rootDir` are harmless
+leftovers if you ever need to emit for debugging, but the build script never
+relies on them.
+
 ```json
 {
   "compilerOptions": {
@@ -120,6 +141,34 @@ Do NOT add `"type": "module"`. `tsconfig.server.json` compiles the server to Com
   },
   "include": ["server/**/*"]
 }
+```
+
+## `esbuild.server.js`
+
+Bundles `server/index.ts` (Express app) into one self-contained
+`dist/server/index.js` with express and every other server-side dependency
+inlined — the deployed container needs NO `node_modules` at runtime at all,
+just this one file plus `dist/client/`. See pitfalls.md §30 for why this
+exists instead of a plain `tsc`-compiled `dist/server/`.
+
+```js
+const esbuild = require('esbuild');
+
+esbuild
+  .build({
+    entryPoints: ['server/index.ts'],
+    bundle: true,
+    platform: 'node',
+    target: 'node18',
+    format: 'cjs',
+    outfile: 'dist/server/index.js',
+    minify: true,
+    logLevel: 'info',
+  })
+  .catch((err) => {
+    console.error(err);
+    process.exit(1);
+  });
 ```
 
 ## `vite.config.ts`
@@ -256,13 +305,18 @@ export function useFetch<T>(url: string) {
 
 ## `keboola-config/setup.sh` (prod)
 
+`dist/` is prebuilt and committed (see pitfalls.md §30), so PROD does not
+install or build anything at container start — it just confirms the
+prebuilt bundle is in place. This is what cuts a ~20-40s cold start down to
+under a second. If you change `package.json` or any source file, you MUST
+run `npm install && npm run build` locally and commit the resulting `dist/`
+— this script does not do it for you.
+
 ```bash
 #!/bin/bash
 set -Eeuo pipefail
 cd /app
-npm install
-npm run build
-echo "PROD setup done"
+echo "PROD setup done (using prebuilt, self-contained dist/)"
 ```
 
 ## `keboola-config/setup-dev.sh` (dev)
@@ -360,9 +414,14 @@ stderr_logfile_maxbytes=0
 
 ## `.gitignore`
 
+`dist/` is deliberately NOT ignored — it's committed as the prebuilt artifact
+(see pitfalls.md §30). Do NOT try to also commit `node_modules/` "to be safe"
+— even pruned to production-only deps it's tens of MB, and pushes that size
+get rejected by this git host with HTTP 413. The whole point of the esbuild
+bundle is that `node_modules` is never needed on the container at all.
+
 ```
 node_modules
-dist
 .env
 .env.*
 ```

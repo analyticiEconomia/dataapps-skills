@@ -1,9 +1,9 @@
 ---
 name: keboola-js-dataapp-boilerplate
 description: >-
-  Complete recipe for building a Keboola JS data app that actually works — React + Vite + TypeScript frontend, Express server querying Snowflake (Query Service) or BigQuery (workspace-query endpoint), Kai chat via polling (not SSE — it drops in the Keboola ingress). Covers both the read-once pre-aggregated model and dynamic per-filter query apps (the shape you get porting a Streamlit dashboard), on a Keboola-managed git repo that auto-deploys on push to main. Also covers restricting an app (or specific reports within it) to members of a Google Group on top of standard Google OIDC login, via the Cloud Identity Groups API (no domain-wide delegation/impersonation needed). Bakes in the pitfalls — Kai 403/404/branchId/SSE drop, pageSize truncation, epoch timestamps, transformation LIMIT truncation, UUID case folds, 431 from filters in a GET query string, esbuild not type-checking, StartupDeadlineExceeded from an unexempted health-check path. Trigger phrases — "new Keboola JS data app", "build a data app with React", "port my Streamlit app to JS", "add Kai chat to a JS data app", "why is my data app showing exactly 10 000 rows", "why does my filter request 431", "restrict this report to a Google Group", "only let X group see this app". Companion skill — keboola-js-dataapp-design for the visual system.
+  Complete recipe for building a Keboola JS data app that actually works — React + Vite + TypeScript frontend, Express server querying Snowflake (Query Service) or BigQuery (workspace-query endpoint), Kai chat via polling (not SSE — it drops in the Keboola ingress). Covers both the read-once pre-aggregated model and dynamic per-filter query apps (the shape you get porting a Streamlit dashboard), on a Keboola-managed git repo that auto-deploys on push to main. Also covers restricting an app (or specific reports within it) to members of a Google Group on top of standard Google OIDC login, via the Cloud Identity Groups API (no domain-wide delegation/impersonation needed). Bakes in the pitfalls — Kai 403/404/branchId/SSE drop, pageSize truncation, epoch timestamps, transformation LIMIT truncation, UUID case folds, 431 from filters in a GET query string, esbuild not type-checking, StartupDeadlineExceeded from an unexempted health-check path, and prebuilding the app (commit `dist/` with the server bundled via esbuild so PROD's `setup.sh` skips `npm install`/`build` entirely — cuts a ~20-40s cold start to under 2s; committing `node_modules` instead gets your `git push` rejected with HTTP 413). Trigger phrases — "new Keboola JS data app", "build a data app with React", "port my Streamlit app to JS", "add Kai chat to a JS data app", "why is my data app showing exactly 10 000 rows", "why does my filter request 431", "restrict this report to a Google Group", "only let X group see this app", "why is my data app slow to start", "prebuild the app", "git push rejected 413", "commit node_modules". Companion skill — keboola-js-dataapp-design for the visual system.
 metadata:
-  version: "1.0.0"
+  version: "1.1.0"
   author: pstepanek
 ---
 
@@ -26,13 +26,16 @@ metadata:
 ├── package.json                       # deps + scripts
 ├── tsconfig.json / tsconfig.server.json
 ├── vite.config.ts                     # dev server + build
+├── esbuild.server.js                  # bundles server/index.ts -> dist/server/index.js (no runtime node_modules)
 ├── keboola-config/                    # copied by Keboola container at start
 │   ├── nginx/sites/default.conf       # ingress → :3000 / :3100 routing
-│   ├── setup.sh / setup-dev.sh        # npm install
+│   ├── setup.sh                       # PROD: no-op, dist/ is prebuilt and committed (pitfalls.md §30)
+│   ├── setup-dev.sh                   # DEV/draft: still runs npm install for live iteration
 │   └── supervisord*/services/*.conf   # process manager (Express :3000 prod, Vite :3000 + Express :3100 dev)
 ├── server/
 │   ├── index.ts                       # Express — /api/data/all, /api/chat/*
 │   └── kbcQuery.ts                    # Snowflake query wrapper
+├── dist/                              # PREBUILT and committed — client + bundled server, not gitignored
 └── src/
     ├── main.tsx
     ├── App.tsx                        # router + mode selector
@@ -46,7 +49,7 @@ Ready-to-copy templates live in `references/`:
 - `references/server-kbcQuery.ts` — **Snowflake** query wrapper (Query Service, correct pageSize)
 - `references/server-kbcQuery-bigquery.ts` — **BigQuery / any-backend** query wrapper (the workspace-query endpoint). Use this when the project dialect is BigQuery, or when porting a Streamlit app whose `query_data()` used `/v2/storage/branch/{b}/workspaces/{w}/query`. Pick ONE of the two helpers.
 - `references/AskKaiPage.tsx` — polling chat client with SSE parser + icon post-processor
-- `references/package.json` — deps + build scripts
+- `references/scaffold.md` — package.json, tsconfig, vite.config.ts, `esbuild.server.js` (bundles the server so PROD needs no runtime `node_modules` — pitfalls.md §30), keboola-config/*, `.gitignore`
 - `references/keboola-config/` — nginx + supervisord configs
 - `references/data-flow.md` — Snowflake pre-agg table pattern
 - `references/pitfalls.md` — every rake we stepped on; read before shipping
@@ -75,7 +78,7 @@ For architecture 2: keep ALL SQL server-side (never build SQL in the browser), r
 
 > **Multi-round sessions (design reviews, copy tweaks, "walk through each tab together") feel slow for two separate reasons — don't conflate them:**
 >
-> 1. **The prod rebuild itself** (~20-40s: git clone → `npm install`, no cache between deploys → `vite build` → `tsc` → container restart) is real and, if iterating straight against prod, unavoidable per push. A draft deployed in dev mode (`deploy_data_app(mode='dev')` once, then just `git push` to its branch for every follow-up tweak — its `git-watcher` + Vite HMR hot-reload without another `deploy_data_app` call) avoids this cost entirely. **But this is an offer, not a default** — some users specifically want every tweak live on the real prod URL, not a separate draft link, and explicitly asked to skip the draft dance entirely (it adds a second URL/branch to track, which was its own source of confusion in practice). Ask once which the user/team prefers; don't re-propose the draft flow every time you feel the rebuild cost — if they said "always straight to prod," that stands until they say otherwise.
+> 1. **The prod rebuild itself**: with the prebuilt-`dist/` setup (pitfalls.md §30) this is now a container restart against a `setup.sh` that does nothing (~1-2s to "server listening"), NOT the old ~20-40s `npm install`/`vite build`/`tsc` cycle — that work moved to your machine, done once before each push. Concretely: after any source change, run `npm install && npm run build` locally, commit `dist/`, push, redeploy. If you skip the local rebuild and only push source, the container will happily keep serving the STALE committed `dist/` with no error — there's no build step left to catch it. A draft deployed in dev mode (`deploy_data_app(mode='dev')` once, then just `git push` to its branch for every follow-up tweak — its `git-watcher` + Vite HMR hot-reload without another `deploy_data_app` call) still avoids even the local-rebuild-per-push cost entirely, since dev mode runs `setup-dev.sh` (live `npm install`, no prebuild) rather than the PROD path. **This is an offer, not a default** — some users specifically want every tweak live on the real prod URL, not a separate draft link, and explicitly asked to skip the draft dance entirely (it adds a second URL/branch to track, which was its own source of confusion in practice). Ask once which the user/team prefers; don't re-propose the draft flow every time you feel the rebuild cost — if they said "always straight to prod," that stands until they say otherwise.
 > 2. **The bigger, easy-to-miss cost in a long agent session is round-trip overhead**, not raw command time: each separate tool call costs a full reasoning pass, and that pass gets slower as the conversation's context grows over a long session — so 5 tiny sequential steps (edit → edit → typecheck → build → git add/commit/push, each its own tool call with reasoning in between) can add up to minutes even though every individual command only takes a few seconds. This applies **regardless** of draft vs. prod. The fix: batch aggressively. Do the edit(s), then run typecheck + build + `git add` + `commit` + `push` as **one** shell invocation, not five. Don't stop to narrate or ask for confirmation between each micro-step of a single already-approved change — save the pause for the one gate that actually needs it (the deploy/run permission itself).
 
 ### Step 1 — Provision the data app in Keboola
@@ -135,13 +138,18 @@ Now (not before) apply `keboola-js-dataapp-design`:
 
 ### Step 7 — Ship
 
+`dist/` is prebuilt and committed (see pitfalls.md §30) — PROD's `setup.sh` no
+longer builds anything, so the build must happen here, before you push:
+
 ```bash
+npm install
+npm run build
 git add -A
 git commit -m "Initial release"
 git push origin main
 ```
 
-Keboola pulls the code on next container start. **A push does not auto-restart a running container** — the current container serves cached code until it hits the auto-suspend timeout (default `autoSuspendAfterSeconds: 300`, 5 minutes — confirm in the app's Advanced Settings, don't assume 15 min), or until you click Redeploy in the UI. See `references/pitfalls.md` §14.
+Keboola pulls the code on next container start. **A push does not auto-restart a running container** — the current container serves cached code until it hits the auto-suspend timeout (default `autoSuspendAfterSeconds: 300`, 5 minutes — confirm in the app's Advanced Settings, don't assume 15 min), or until you click Redeploy in the UI. See `references/pitfalls.md` §14. This now matters even more than before: since PROD no longer builds on start, a push without a matching local `npm run build` + committed `dist/` update just gets you a container faithfully serving the OLD code, with nothing anywhere to warn you.
 
 ## Pre-flight checklist
 
@@ -157,6 +165,8 @@ Before opening a PR / calling the app finished:
 - [ ] Kai chat: polling flow (`/api/chat/start` + `/api/chat/poll`), not SSE
 - [ ] First-tab Documentation + last-tab Ask Kai present
 - [ ] `npm run build` clean, no TypeScript errors
+- [ ] `dist/` rebuilt AFTER the latest source change and committed — PROD's `setup.sh` no longer builds it for you (pitfalls.md §30); a push with stale `dist/` silently serves old code
+- [ ] `dist/server/index.js` is the bundled esbuild output (check it's one file with no adjacent `require('./kbcQuery')`-style relative imports left unresolved), not a leftover plain-`tsc` compile that expects `node_modules` at runtime
 - [ ] Local dev works (`npm run dev` on Windows: two terminals, one `npm run dev` for Vite :3000, one `tsx watch server/index.ts` for Express :3100)
 
 ## Handy links
