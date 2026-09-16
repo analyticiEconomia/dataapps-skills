@@ -19,7 +19,7 @@ metadata:
 
 ## The seven non-negotiables
 
-1. **Mode selector on first load.** Landing screen with two options (Classic report, Story mode). Persist to `localStorage['<app-slug>-view-mode']`. From then on the mode is remembered; a small switcher stays available in the corner / sidebar.
+1. **Classic mode only by default — do NOT build Story mode unless the user explicitly asks for it.** No mode selector, no landing screen, no Story components generated speculatively. If the user later asks for "story mode" / "board view" / "presentation mode", add it then (see `references/mode-selector.md` and `references/story-mode.md`) and only then wire up the selector + `localStorage['<app-slug>-view-mode']` persistence.
 2. **Documentation tab is always first.** Both in Classic (leftmost tab) and Story (opening chapter). It explains what the app shows, where the data comes from, what any domain-specific terms mean in this app's context, and who to ping if numbers look off.
 3. **Ask Kai tab is always last.** Free-form question-and-answer over the app's data. Uses the polling flow from the boilerplate skill.
 4. **Every chart is wrapped in `<ChartExplainer>`.** No raw `<BarChart>` in a page — it always sits inside a wrapper that has an ⓘ / ? affordance. The panel reveals two paragraphs: "how to read this" and "where the number comes from" — both in plain language, no SQL.
@@ -62,19 +62,17 @@ Inter loaded from Google Fonts with `font-feature-settings: "ss01", "cv11"; font
 
 ## Structure at page level
 
-Every mode ends up rendering pages from the same data source. Layout:
-
-**Classic mode:**
+**Default — Classic mode only:**
 ```
 Documentation (mandatory first) → Feature tab 1 → Feature tab 2 → … → Ask Kai (mandatory last)
 ```
-Sidebar navigation, one insight per card, cards stacked vertically inside a `max-w-4xl` container.
+Sidebar navigation, one insight per card, cards stacked vertically inside a `max-w-4xl` container. No mode selector, no Story code.
 
-**Story mode:**
+**Story mode — only when the user asks for it:**
 ```
 Cover → Documentation (opening chapter, condensed) → Chapter 1 → … → Recommendations → End (Ask Kai link)
 ```
-Full-viewport chapters, right-side progress dots, scroll-triggered animations. See `references/story-mode.md` for the dramaturgical arc pattern.
+Full-viewport chapters, right-side progress dots, scroll-triggered animations. See `references/story-mode.md` for the dramaturgical arc pattern, and `references/mode-selector.md` for wiring the landing screen + `localStorage` persistence once Story is actually requested.
 
 ## The `<ChartExplainer>` rule
 
@@ -101,14 +99,14 @@ See `references/chart-explainer.md` for good vs bad examples.
 
 ## Pre-ship checklist for the design
 
-- [ ] Landing selector shows on first visit, mode persists in `localStorage`
-- [ ] Documentation is the leftmost tab in Classic AND the opening chapter in Story
-- [ ] Ask Kai is the rightmost tab in Classic AND end-of-scroll CTA in Story
+- [ ] Story mode was NOT built unless the user explicitly asked for it — Classic only by default, no landing selector
+- [ ] Documentation is the leftmost tab in Classic (and the opening chapter in Story, if built)
+- [ ] Ask Kai is the rightmost tab in Classic (and end-of-scroll CTA in Story, if built)
 - [ ] Every chart is inside `<ChartExplainer>` with non-SQL copy
 - [ ] Hero numbers use `<CountUp>` and animate on scroll-into-view, not on load
 - [ ] KPI cards in a row have equal min-height (add `<div>&nbsp;</div>` spacer if the delta is optional)
 - [ ] Colors are semantic — no red "just because" and no rainbow palettes
-- [ ] Story mode ORDERs chapters dramaturgically (context → pattern → conflict → resolution), not by data importance
+- [ ] If Story mode was built: chapters ORDER dramaturgically (context → pattern → conflict → resolution), not by data importance
 - [ ] Every LIMITed pre-agg table has either a KPI count exposing the true total, OR a caveat in the ChartExplainer
 - [ ] Tabular numbers use `font-variant-numeric: tabular-nums`
 - [ ] `Inter` font is loaded (Google Fonts) and used everywhere

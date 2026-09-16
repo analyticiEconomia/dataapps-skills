@@ -7,12 +7,22 @@
 //   with a `delta` field (not `textDelta`), plus tool-input-available and error.
 // - Icon post-processing: Kai emits `icon:xxx:` placeholders — mapped to emoji.
 // - `next_actions` block stripping so the raw markdown block doesn't render.
+// - Table/CSV rendering: Kai frequently answers "export this as CSV" requests
+//   with a ```csv fenced block or a markdown pipe table, NOT a real file. This
+//   component had no markdown/table parser at all — it dumped everything through
+//   `whitespace-pre-wrap`, so a CSV block showed up as one unreadable wall of
+//   commas (or a pipe-table as misaligned `| a | b |` text) with nothing to
+//   click. `extractKaiTables` below detects those blocks and renders them as a
+//   real `<table>` with a working "Download CSV" button that writes a properly
+//   quoted, semicolon-delimited, UTF-8-BOM file — semicolons + BOM because
+//   Excel on a cs-CZ locale treats `,` as the decimal separator and mis-opens
+//   comma-delimited / non-BOM files as a single garbled column.
 //
 // Requires: nothing beyond React + lucide-react. Style hooks are Tailwind-ish
 // but you can restyle freely.
 
 import { useState, useRef, useEffect, useCallback } from 'react';
-import { MessageCircle, Send, Loader2 } from 'lucide-react';
+import { MessageCircle, Send, Loader2, Download } from 'lucide-react';
 
 interface ChatMessage {
   role: 'user' | 'assistant';
@@ -52,6 +62,157 @@ function stripNextActions(text: string): string {
   // Kai may send a trailing ```next_actions … ``` block; hide it (or parse it
   // into buttons in your UI — omitted here for brevity).
   return text.replace(/```next_actions[\s\S]*?(```|$)/g, '').trim();
+}
+
+// --- Table / CSV rendering -------------------------------------------------
+
+type KaiSegment = { type: 'text'; content: string } | { type: 'table'; rows: string[][] };
+
+function parseDelimited(block: string): string[][] {
+  const delimiter = block.includes('\t') ? '\t' : ',';
+  return block
+    .trim()
+    .split('\n')
+    .map((line) => line.split(delimiter).map((cell) => cell.trim().replace(/^"|"$/g, '')));
+}
+
+function parseMarkdownTable(block: string): string[][] | null {
+  const lines = block.trim().split('\n').filter(Boolean);
+  if (lines.length < 2 || !lines[0].includes('|')) return null;
+  // second line must be the |---|---| separator
+  if (!/^\s*\|?[\s:|-]+\|?\s*$/.test(lines[1])) return null;
+  const stripPipes = (l: string) => l.trim().replace(/^\|/, '').replace(/\|$/, '');
+  return [lines[0], ...lines.slice(2)].map((l) => stripPipes(l).split('|').map((c) => c.trim()));
+}
+
+// Splits Kai's message into plain-text segments and detected table segments
+// (```csv / ```tsv fenced blocks, or markdown pipe tables) so each table can
+// render as a real <table> instead of raw pre-wrap text.
+function extractKaiTables(text: string): KaiSegment[] {
+  const segments: KaiSegment[] = [];
+  const fenceRe = /```(csv|tsv)\n([\s\S]*?)```/gi;
+  let lastIndex = 0;
+  let match: RegExpExecArray | null;
+
+  while ((match = fenceRe.exec(text))) {
+    if (match.index > lastIndex) {
+      segments.push({ type: 'text', content: text.slice(lastIndex, match.index) });
+    }
+    segments.push({ type: 'table', rows: parseDelimited(match[2]) });
+    lastIndex = fenceRe.lastIndex;
+  }
+  if (lastIndex < text.length) segments.push({ type: 'text', content: text.slice(lastIndex) });
+
+  // Second pass: pull markdown pipe tables out of the remaining text segments.
+  const final: KaiSegment[] = [];
+  for (const seg of segments) {
+    if (seg.type === 'table') {
+      final.push(seg);
+      continue;
+    }
+    const lines = seg.content.split('\n');
+    let buffer: string[] = [];
+    let textBuffer: string[] = [];
+    const flushText = () => {
+      if (textBuffer.length) final.push({ type: 'text', content: textBuffer.join('\n') });
+      textBuffer = [];
+    };
+    const flushTable = () => {
+      if (buffer.length >= 2) {
+        const rows = parseMarkdownTable(buffer.join('\n'));
+        if (rows) {
+          final.push({ type: 'table', rows });
+        } else {
+          textBuffer.push(...buffer);
+        }
+      } else {
+        textBuffer.push(...buffer);
+      }
+      buffer = [];
+    };
+    for (const line of lines) {
+      if (line.includes('|')) {
+        buffer.push(line);
+      } else {
+        flushTable();
+        textBuffer.push(line);
+      }
+    }
+    flushTable();
+    flushText();
+  }
+  return final;
+}
+
+function downloadCsv(rows: string[][], filename = 'kai-export.csv') {
+  // Semicolon delimiter + UTF-8 BOM: Excel on cs-CZ locale uses ',' as the
+  // decimal separator and mis-parses comma-delimited / non-BOM files.
+  const escape = (cell: string) => (/[;"\n]/.test(cell) ? `"${cell.replace(/"/g, '""')}"` : cell);
+  const csv = rows.map((row) => row.map(escape).join(';')).join('\r\n');
+  const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8;' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(a.href);
+}
+
+function KaiTable({ rows }: { rows: string[][] }) {
+  if (!rows.length) return null;
+  const [header, ...body] = rows;
+  return (
+    <div className="my-2 rounded-lg border border-slate-700/50 overflow-hidden">
+      <div className="flex justify-end px-2 py-1 bg-slate-800/70">
+        <button
+          onClick={() => downloadCsv(rows)}
+          className="flex items-center gap-1 text-xs text-blue-400 hover:text-blue-300"
+        >
+          <Download size={12} /> CSV
+        </button>
+      </div>
+      <div className="overflow-x-auto">
+        <table className="w-full text-xs">
+          <thead>
+            <tr>
+              {header.map((h, i) => (
+                <th key={i} className="text-left px-3 py-1.5 bg-slate-800/50 text-slate-300 font-medium">
+                  {h}
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {body.map((row, ri) => (
+              <tr key={ri} className="border-t border-slate-700/50">
+                {row.map((cell, ci) => (
+                  <td key={ci} className="px-3 py-1.5 text-slate-200 whitespace-nowrap">
+                    {cell}
+                  </td>
+                ))}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
+function KaiMessage({ content }: { content: string }) {
+  const segments = extractKaiTables(content);
+  return (
+    <>
+      {segments.map((seg, i) =>
+        seg.type === 'table' ? (
+          <KaiTable key={i} rows={seg.rows} />
+        ) : seg.content.trim() ? (
+          <div key={i} className="whitespace-pre-wrap">
+            {seg.content}
+          </div>
+        ) : null
+      )}
+    </>
+  );
 }
 
 export function AskKaiPage() {
@@ -235,11 +396,16 @@ export function AskKaiPage() {
                   : 'bg-slate-800/70 text-slate-200 border border-slate-700/50'
               }`}
             >
-              <div className="text-sm whitespace-pre-wrap">
-                {msg.role === 'assistant'
-                  ? postProcessKai(stripNextActions(msg.content)) ||
-                    (isLoading && i === messages.length - 1 ? '…' : '')
-                  : msg.content}
+              <div className="text-sm">
+                {msg.role === 'assistant' ? (
+                  postProcessKai(stripNextActions(msg.content)) ? (
+                    <KaiMessage content={postProcessKai(stripNextActions(msg.content))} />
+                  ) : isLoading && i === messages.length - 1 ? (
+                    '…'
+                  ) : null
+                ) : (
+                  <div className="whitespace-pre-wrap">{msg.content}</div>
+                )}
               </div>
             </div>
           </div>

@@ -75,6 +75,14 @@ if (event.type === 'text-delta') {
 
 While you're there, also handle: `type: 'text'` (full text), `type: 'tool-input-available'` (surface which tool Kai is calling), `type: 'error'` (surface Kai errors). See `references/AskKaiPage.tsx`.
 
+## 4b. Kai's "download as CSV" comes out unusable
+
+**Symptom:** user asks Kai to export data as CSV; Kai replies with something, but it's either one unreadable wall of comma-separated text, or a misaligned `| a | b | c |` pipe table — nothing downloadable, nothing you can paste into Excel cleanly.
+
+**Root cause:** Kai has no real file-export tool — when asked for CSV it just emits a ` ```csv ` fenced block or a markdown pipe table as **text** in its chat response. The stock `AskKaiPage.tsx` had zero markdown/table parsing: every message rendered through plain `whitespace-pre-wrap`, so those blocks showed up as raw text with the backticks/pipes still in it. Even copy-pasted by hand, a comma-delimited block opens wrong in Czech-locale Excel (`,` is the decimal separator there) and un-quoted commas inside cell values shift columns.
+
+**Fix:** `references/AskKaiPage.tsx` now detects ` ```csv `/` ```tsv ` fences and markdown pipe tables in Kai's response (`extractKaiTables`) and renders them as a real `<table>` with a working "Download CSV" button (`downloadCsv`) that writes a properly quoted, semicolon-delimited, UTF-8-BOM file so it opens correctly in Excel. If you already scaffolded an app before this fix, diff your `AskKaiPage.tsx` against the reference and pull in `extractKaiTables` / `KaiTable` / `KaiMessage` / `downloadCsv`.
+
 ## 5. Kai service discovery — look for `kai-assistant`
 
 **Symptom:** discovery finds services but not Kai. Logs show `Available services: docker-runner, import, syrup, oauth, sqldep-analyzer, queue, sandboxes, billing, ai, buffer, ...`.

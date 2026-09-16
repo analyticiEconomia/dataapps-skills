@@ -1,6 +1,8 @@
 # Mode selector — landing screen
 
-First time a user opens the app they see a two-card landing that asks: Classic or Story? The choice is saved to `localStorage` under the app's slug. Next visit skips the landing and opens the last-chosen mode.
+**Only build this when the user has explicitly asked for Story mode.** Default apps ship Classic-only, with no selector and no Story code at all — don't add this speculatively.
+
+Once Story is requested: first time a user opens the app they see a two-card landing that asks: Classic or Story? The choice is saved to `localStorage` under the app's slug. Next visit skips the landing and opens the last-chosen mode.
 
 Every page (both modes) exposes a small "switch to the other mode" affordance:
 - Classic → bottom of sidebar (`Switch to Story mode` gradient button)
