@@ -1,14 +1,14 @@
 ---
 name: keboola-js-dataapp-design
-description: Design system + component library for Keboola JS data apps built with React + Vite + TypeScript. Ships two report modes — Classic (tabbed report for analytical work) and Story (single-scroll narrative for board presentations) — with a mode selector on first load. Enforces the rules that make a data app immediately usable — Documentation as the first page, Ask Kai as the last, and every chart wrapped in a "how to read + where the number comes from" explainer in plain language (not SQL). Provides the CSS design tokens, InsightCard / HeroKpi / DataTable / ChartExplainer components, and dramaturgical structure for the Story mode. Trigger phrases — "design a Keboola data app", "add a story mode", "make the report look premium", "why is my chart missing an explainer", "board-ready dashboard". Companion skill — `keboola-js-dataapp-boilerplate` for infrastructure, server, and Kai integration.
+description: Design system + component library for Keboola JS data apps built with React + Vite + TypeScript. Ships two report modes — Classic (tabbed report for analytical work) and Story (single-scroll narrative for board presentations) — with a mode selector on first load. Enforces the rules that make a data app immediately usable — Documentation as the first page, Ask Kai as the last, and every chart wrapped in a "how to read + where the number comes from" explainer in plain language (not SQL). Provides the CSS design tokens, InsightCard / HeroKpi / DataTable / ChartExplainer components, and dramaturgical structure for the Story mode. Includes a light/dark theme toggle (dark by default) driven by CSS variables. Trigger phrases — "design a Keboola data app", "add dark mode / light mode toggle", "světlý / tmavý režim", "add a story mode", "make the report look premium", "why is my chart missing an explainer", "board-ready dashboard". Companion skill — `keboola-js-dataapp-boilerplate` for infrastructure, server, and Kai integration.
 metadata:
-  version: "1.0.0"
+  version: "1.1.0"
   author: pstepanek
 ---
 
 # Keboola JS Data App — Design
 
-**What this produces:** a dark-themed, premium-feel React data app with a mode selector on first load (Classic tabs vs Story scroll), enforced Documentation and Ask Kai tabs, animated hero KPIs, and every chart accompanied by a "how to read" explainer that reads like a caption in a newspaper — not like SQL.
+**What this produces:** a premium-feel React data app (dark by default, with a light/dark toggle in the sidebar) with a mode selector on first load (Classic tabs vs Story scroll), enforced Documentation and Ask Kai tabs, animated hero KPIs, and every chart accompanied by a "how to read" explainer that reads like a caption in a newspaper — not like SQL.
 
 **Requires:** the infrastructure skeleton from `keboola-js-dataapp-boilerplate`. This skill is the layer on top.
 
@@ -37,6 +37,7 @@ metadata:
 - `references/required-pages.md` — Documentation and Ask Kai templates.
 - `references/mode-selector.md` — landing screen code + localStorage handling.
 - `references/copy-guide.md` — voice, tone, and terminology (Czech + English variants).
+- `references/theme-toggle.md` — light/dark toggle: Tailwind `slate` remap to CSS variables, `text-ink`, Recharts grid/tooltip, button + no-flash script, verification.
 
 ## The design tokens (short version)
 
@@ -55,6 +56,8 @@ metadata:
 ```
 
 Background is always a subtle radial-gradient-blur combo — never a flat color. See `references/index.css`.
+
+Neutral colours are **not** hard-coded: `slate-*`, `ink` and the light accent-text shades resolve to CSS variables with a dark and a light set, switched by `<html data-theme>`. Never write `#0F172A` / `text-white` for surfaces or body text in new code. Use the Tailwind classes or `rgb(var(--…))`. See `references/theme-toggle.md`.
 
 ## Fonts
 
@@ -111,3 +114,5 @@ See `references/chart-explainer.md` for good vs bad examples.
 - [ ] Tabular numbers use `font-variant-numeric: tabular-nums`
 - [ ] `Inter` font is loaded (Google Fonts) and used everywhere
 - [ ] Dark background is the radial-gradient combo, not `#000` or `#111`
+- [ ] Light/dark toggle present in the sidebar header, dark by default, choice survives reload (`references/theme-toggle.md`)
+- [ ] Checked in light mode after a full reload: chart grid light, tooltip light, no white-on-white text (`text-white` only on solid colour backgrounds, else `text-ink`)
