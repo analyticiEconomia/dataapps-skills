@@ -1,7 +1,7 @@
 ---
 name: keboola-js-dataapp-boilerplate
 description: >-
-  Complete recipe for building a Keboola JS data app that actually works — React + Vite + TypeScript frontend, Express server querying Snowflake (Query Service) or BigQuery (workspace-query endpoint), Kai chat via polling (not SSE — it drops in the Keboola ingress). Covers both the read-once pre-aggregated model and dynamic per-filter query apps (the shape you get porting a Streamlit dashboard), on a Keboola-managed git repo that auto-deploys on push to main. Also covers restricting an app (or specific reports within it) to members of a Google Group on top of standard Google OIDC login, via the Cloud Identity Groups API (no domain-wide delegation/impersonation needed). Bakes in the pitfalls — Kai 403/404/branchId/SSE drop, pageSize truncation, epoch timestamps, transformation LIMIT truncation, UUID case folds, 431 from filters in a GET query string, esbuild not type-checking, StartupDeadlineExceeded from an unexempted health-check path, and prebuilding the app (commit `dist/` with the server bundled via esbuild so PROD's `setup.sh` skips `npm install`/`build` entirely — cuts a ~20-40s cold start to under 2s; committing `node_modules` instead gets your `git push` rejected with HTTP 413). Trigger phrases — "new Keboola JS data app", "build a data app with React", "port my Streamlit app to JS", "add Kai chat to a JS data app", "why is my data app showing exactly 10 000 rows", "why does my filter request 431", "restrict this report to a Google Group", "only let X group see this app", "why is my data app slow to start", "prebuild the app", "git push rejected 413", "commit node_modules". Companion skill — keboola-js-dataapp-design for the visual system.
+  Complete recipe for a Keboola JS data app that actually works — React + Vite + TypeScript frontend, Express server querying Snowflake (Query Service) or BigQuery (workspace-query endpoint), Kai chat via polling (not SSE — it drops in the Keboola ingress). Covers both the read-once pre-aggregated model and dynamic per-filter query apps (the shape you get porting a Streamlit dashboard), on a Keboola-managed git repo that auto-deploys on push to main. Also covers restricting an app (or specific reports within it) to members of a Google Group on top of standard Google OIDC login, via the Cloud Identity Groups API (no domain-wide delegation/impersonation needed). Bakes in the pitfalls — Kai 403/404/branchId/SSE drop, pageSize truncation, epoch timestamps, transformation LIMIT truncation, UUID case folds, 431 from filters in a GET query string, esbuild not type-checking, StartupDeadlineExceeded from an unexempted health-check path, and prebuilding the app (commit `dist/` with the server bundled via esbuild so PROD's `setup.sh` skips `npm install`/`build` entirely — cuts a ~20-40s cold start to under 2s; committing `node_modules` instead gets your `git push` rejected with HTTP 413). Trigger phrases — "Economia data app", "new Economia Keboola JS data app", "Subscription Command Center", "new Keboola JS data app for Economia", "build a data app with React", "port my Streamlit app to JS", "add Kai chat to a JS data app", "why is my data app showing exactly 10 000 rows", "why does my filter request 431", "restrict this report to a Google Group", "only let X group see this app", "why is my data app slow to start", "prebuild the app", "git push rejected 413", "commit node_modules". Companion skills — `keboola-js-dataapp-design` for the visual system, `economia-dataapp-google-group-access` for the auth add-on.
 metadata:
   version: "1.1.0"
   author: pstepanek
@@ -15,7 +15,7 @@ metadata:
 
 ## Companion skills
 
-- **`keboola-js-dataapp-design`** — visual system (Classic tabs + Story mode), chart "how to read" explainers, required Docs and Ask Kai tabs. Always invoke together with this one when building a new app.
+- **`keboola-js-dataapp-design`** — visual system (Classic tabs by default; Story mode only on request), chart "how to read" explainers, required Docs and Ask Kai tabs. Always invoke together with this one when building a new app.
 - **`keboola-storage-query`** — SQL patterns for `query_data` MCP.
 - **`keboola-dataapp-add-feedback`** — Google Chat feedback button.
 
@@ -38,8 +38,8 @@ metadata:
 ├── dist/                              # PREBUILT and committed — client + bundled server, not gitignored
 └── src/
     ├── main.tsx
-    ├── App.tsx                        # router + mode selector
-    ├── StoryPage.tsx                  # (see design skill)
+    ├── App.tsx                        # router (sidebar nav; mode selector only if Story is requested)
+    ├── StoryPage.tsx                  # ONLY if the owner asks for Story mode (see design skill)
     ├── index.css                      # design tokens (see design skill)
     └── hooks/useFetch.ts
 ```
@@ -131,10 +131,47 @@ Every table added here must also be added to `storage.input.tables` in the app's
 ### Step 6 — Design pass
 
 Now (not before) apply `keboola-js-dataapp-design`:
-- Add landing mode selector (Classic vs Story) with `localStorage` persistence
+- **Classic mode only by default — do NOT build Story mode or a mode selector** unless the app owner explicitly asks for it (see below)
 - First tab: `Documentation` (mandatory)
-- Last tab: `Ask Kai` (mandatory)
+- Last tab: `Ask Kai` — **Economia: build it, but HIDE it by default** (see below)
 - Every chart wrapped in `<ChartExplainer>` — "how to read" + "where the number comes from" (plain language, not SQL)
+
+#### Economia rule: Story mode — known, but not built by default
+
+You know how to build Story mode (single-scroll presentation with chapters,
+progress dots, landing Classic-vs-Story selector) — the full recipe is in
+`keboola-js-dataapp-design` → `references/story-mode.md` and
+`references/mode-selector.md`. **Do not build it by default.** A new Economia
+app ships Classic only: sidebar navigation, no landing selector, no
+`StoryPage.tsx`, no `localStorage['<app-slug>-view-mode']`.
+
+Build Story mode only when the app owner explicitly asks ("story mode",
+"board view", "prezentační režim", …). Then add `StoryPage.tsx`, the landing
+selector and the view-mode persistence in one change, following the design
+skill's references. Don't offer it proactively on every build — mention once
+that it exists if a report is clearly meant for board presentations.
+
+#### Economia rule: Ask Kai is hidden by default
+
+This overrides the design skill's "Ask Kai tab is mandatory". Keep the Kai
+plumbing in the app (`/api/chat/start` + `/api/chat/poll` routes,
+`AskKaiPage.tsx`, `KAI_APP_CONTEXT`), but gate the sidebar entry and the
+route behind one flag in `src/App.tsx`, set to `false`:
+
+```tsx
+// Ask Kai is hidden by default for Economia apps. Flip to true once Kai is
+// approved for this report; server routes and AskKaiPage stay in place.
+const SHOW_KAI = false;
+
+if (route === 'kai' && SHOW_KAI) page = <AskKaiPage />;
+{SHOW_KAI && <button onClick={() => go('kai')}>Ask Kai</button>}
+```
+
+Only switch it to `true` when the app owner explicitly asks for Kai on that
+report. Turning it on = flip the flag, rebuild `dist/`, push, redeploy (with
+the owner's "spusť"). The `STORAGE_API_TOKEN` secret is only required once
+Kai is actually visible. Proven on "Yield Reports" (project 708,
+config `01m3rrha312nvcxp6fz9d0hwfk`), 2026-09-30.
 
 ### Step 7 — Ship
 
@@ -155,7 +192,9 @@ Keboola pulls the code on next container start. **A push does not auto-restart a
 
 Before opening a PR / calling the app finished:
 
-- [ ] `STORAGE_API_TOKEN` secret set in Advanced Settings (Kai without it → 500 with instructional error)
+- [ ] No Story mode / mode selector unless the owner explicitly asked for it
+- [ ] Ask Kai hidden by default (`SHOW_KAI = false` in `src/App.tsx`) unless the owner explicitly asked for it
+- [ ] If Kai is visible: `STORAGE_API_TOKEN` secret set in Advanced Settings (Kai without it → 500 with instructional error)
 - [ ] Every pre-agg table exists in `storage.output.tables` (workspace-only tables silently disappear)
 - [ ] Every table the app queries is also declared in the app's own `storage.input.tables` (Step 1 + Step 5) — not just implicitly reachable through the workspace connection
 - [ ] Every table with hero-KPI-count usage has that count exposed as a KPI column, NOT computed from `table.length`
@@ -163,7 +202,7 @@ Before opening a PR / calling the app finished:
 - [ ] `pageSize` in `queryTable` is at least 50 000 (default 10 000 silently truncates larger tables)
 - [ ] `snapshotAt` is converted from Unix epoch **seconds** to ISO string on the server
 - [ ] Kai chat: polling flow (`/api/chat/start` + `/api/chat/poll`), not SSE
-- [ ] First-tab Documentation + last-tab Ask Kai present
+- [ ] First-tab Documentation present; Ask Kai built as the last tab but behind `SHOW_KAI` (hidden by default)
 - [ ] `npm run build` clean, no TypeScript errors
 - [ ] `dist/` rebuilt AFTER the latest source change and committed — PROD's `setup.sh` no longer builds it for you (pitfalls.md §30); a push with stale `dist/` silently serves old code
 - [ ] `dist/server/index.js` is the bundled esbuild output (check it's one file with no adjacent `require('./kbcQuery')`-style relative imports left unresolved), not a leftover plain-`tsc` compile that expects `node_modules` at runtime

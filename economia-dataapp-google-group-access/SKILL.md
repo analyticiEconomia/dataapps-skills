@@ -2,18 +2,19 @@
 name: economia-dataapp-google-group-access
 description: >-
   Add Google SSO login + Google-Group-based report access to an Economia
-  Keboola JS data app, after the app itself already exists. Covers where the
-  shared credentials live (1Password "Keboola JS Apps Auth"), how to check/
-  request the target Google Group from Economia IT, exactly what to add where
-  in Keboola (Authentication + Secrets), and the Express middleware that
-  enforces it. Use when a new Economia data app needs to be restricted to a
-  specific team/group, when asked "jak nastavit Google group access pro
-  appku", "kdo smí vidět tenhle report", or when following up on the
-  Subscription Command Center pattern for a new app. Companion to
-  keboola-js-dataapp-boilerplate/setup (which create the app itself) — this
-  skill only covers the auth add-on layer.
+  Keboola data app (JS/Express or Python/Flask), after the app itself already
+  exists. Covers where the shared credentials live (1Password "Keboola JS
+  Apps Auth"), how to check/request the target Google Group from Economia IT,
+  exactly what to add where in Keboola (Authentication + Secrets), and the
+  middleware that enforces it — Express (`references/middleware.ts`) or Flask
+  (`references/group_auth.py`). Use when a new Economia data app needs to be
+  restricted to a specific team/group, when asked "jak nastavit Google group
+  access pro appku", "kdo smí vidět tenhle report", or when following up on
+  the Subscription Command Center / Traffic report patterns for a new app.
+  Companion to keboola-js-dataapp-boilerplate/setup (which create the app
+  itself) — this skill only covers the auth add-on layer.
 metadata:
-  version: "1.0.0"
+  version: "1.2.0"
   author: pstepanek
   org: economia
 ---
@@ -26,8 +27,29 @@ this gates the app behind Google SSO login *and* restricts it to members of a
 specific Google Group — e.g. only `dataapps_product@economia.cz` can see the
 Product report.
 
-**Proven on:** "Subscription Command Center" (config `01ky4g463srtqvevq13y02k753`,
-project 753 "00 Distribution"), built 2026-08-12 → 2026-08-20.
+**Proven on:**
+- "Subscription Command Center" (JS/Express, config `01ky4g463srtqvevq13y02k753`,
+  project 753 "00 Distribution"), built 2026-08-12 → 2026-08-20; access-denied
+  contact line fixed 2026-09-30 (see step 6, Gotcha 7).
+- "Traffic report" (Python/Flask, config `01m22m2xg5kg6f1yj3r5k3dn9g`, data
+  app id `985851973`, project 757), fixed 2026-09-16 — see Gotcha 6. Note: as
+  of 2026-09-30 this app's `REQUIRED_GROUP_EMAIL`/auth is unset again
+  (`auth_required: false`) — check current state before assuming it's still
+  gated.
+- "Yield Reports" (JS/Express, config `01m3rrha312nvcxp6fz9d0hwfk`, project
+  708 "00 Yield") — live gate on `dataapps_yield@economia.cz`; contact line
+  added 2026-09-30.
+- "Mediakit" (project 757) has OIDC but **not** a working group gate — see
+  Gotcha 8, not yet fixed.
+
+**Two stacks, same pattern.** Economia data apps come in two shapes: JS
+(React + Vite + Express, `keboola-js-dataapp-boilerplate`) and Python/Flask +
+gunicorn (`app.py`, `pyproject.toml`, no Node at all). The Keboola-side setup
+(steps 1–5, 7, 8 below) is identical either way — only step 6 (which
+middleware file to copy in, and which dependency to declare) differs. Check
+which stack an app uses before following step 6: a `package.json` at the repo
+root means JS/Express (`references/middleware.ts`); a `pyproject.toml` /
+`app.py` means Python/Flask (`references/group_auth.py`).
 
 ## Credentials — where they live
 
@@ -130,12 +152,36 @@ expose a secrets field.
 > than building a new one, check its actual current secrets/variables in the
 > Keboola UI before assuming which pair it ended up on.
 
-### 6. Add the middleware to the app's code
+### 6. Add the middleware/gate to the app's code
 
-Copy `references/middleware.ts` into `server/index.ts`, placed **immediately
-after** `app.use(express.json(...))` — before every route, including Kai
-chat routes and data endpoints, so the gate protects the API too. Add
-`"google-auth-library"` to `package.json` dependencies.
+**Access-denied page contact line.** Both reference templates end the
+"you're not in the group" message with `Pokud si myslíte, že byste přístup
+mít měli, napište na vit.svoboda@economia.cz nebo pavel.stepanek@economia.cz.`
+— Vít and Pavel are the standing contacts for access requests on gated
+reports. Keep this exact pair whenever you touch a denied-page string; don't
+revert to a generic "kontaktujte administrátora" (that's what Subscription
+Command Center originally shipped with, fixed 2026-09-30).
+
+**JS/Express apps:** copy `references/middleware.ts` into `server/index.ts`,
+placed **immediately after** `app.use(express.json(...))` — before every
+route, including Kai chat routes and data endpoints, so the gate protects the
+API too. Add `"google-auth-library"` to `package.json` dependencies.
+
+**Python/Flask apps:** copy `references/group_auth.py` into the app root and
+register it as a `before_request` hook in `app.py`, **before any route
+definitions**:
+
+```python
+from group_auth import check_group_access
+
+@app.before_request
+def _group_access_gate():
+    return check_group_access()
+```
+
+Add both `"google-auth>=2.30.0"` **and** `"requests>=2.31.0"` to
+`pyproject.toml` `dependencies` — see Gotcha 6, this is the one step that's
+easy to get wrong porting the JS version by hand.
 
 ### 7. Ship
 
@@ -230,6 +276,94 @@ seen specifically inside the Claude desktop app's embedded Electron browser,
 which handles cookies across the OAuth redirect chain less reliably than a
 normal browser. Retest in a normal browser/incognito before assuming it's
 real. `<app-url>/_proxy/sign_out` clears a stuck stale login.
+
+### 6. Python/Flask: missing `requests` dependency silently breaks the whole app, not just the gate
+
+**Symptom:** app looks "fine" from the outside (`state: running` in Keboola,
+reachable URL) but the group gate never actually blocks anyone — including
+emails that were just removed from the group. No error visible anywhere
+convenient.
+
+**Root cause:** `google.auth.transport.requests.AuthorizedSession` (used in
+`references/group_auth.py`) needs the `requests` package installed
+separately — unlike the JS `google-auth-library`, which bundles its own HTTP
+transport and needs no extra dependency. If `pyproject.toml` only lists
+`google-auth` and not `requests`, importing `group_auth` raises
+`ImportError: The requests library is not installed...`. Since `app.py`
+imports `group_auth` at module level, the **entire app** fails to boot — not
+just the gate. The container's gunicorn worker crashes and retries a few
+times, then gives up (`FATAL`, "too many start retries too quickly").
+
+**Why it looks like it's "working":** Keboola appears to keep serving the
+last successfully-running container when a new deploy's container fails to
+boot, instead of surfacing a hard failure. So the app stays reachable and
+`state: running` — but it's silently the *previous* deployed version, which
+in this case predated the group-access gate entirely. Anyone could log in
+regardless of group membership, because the code doing the check was never
+actually live.
+
+**Fix:** add `"requests>=2.31.0"` to `pyproject.toml` alongside `google-auth`
+(see step 6 above), commit, push, then explicitly redeploy — a `git push`
+alone does not restart the running container.
+
+**Diagnosis path if this happens again:** check the raw container startup
+logs (not just `state`) for an `ImportError` traceback around `group_auth`
+import; a `last_run` stuck in `"starting"` with no `failure_reason` is also a
+tell that a redeploy attempt is failing to boot while an older container
+keeps answering requests.
+
+### 7. The Keboola-configured "deploy branch" can differ from the repo's default branch
+
+Subscription Command Center's Keboola config (`parameters.dataApp.git.branch`)
+says `main`, but `git clone` without a branch arg checked out `init` — a
+different, older branch that is the repo's actual `HEAD`/default. The real,
+currently-deployed code lives on `main`; `init` looks similar but is stale.
+Always check the app's config for the configured branch name and explicitly
+`git fetch origin <that-branch> && git checkout <that-branch>` — don't trust
+`git clone`'s default checkout. Found 2026-09-30 while patching the
+access-denied contact line.
+
+### 8. Mediakit has OIDC login but no working group-membership check
+
+Mediakit (config `01m3rh0x2aq0sm2q4h3z8xzw1h`, project 757) has
+`auth_required: true` with Google OIDC configured, and a secret that looks
+like it was meant to hold the service-account JSON — but the secret *name*
+itself is the mangled JSON content (e.g. starts
+`#TYPE_SERVICE_ACCOUNT___PROJECT_ID_KEBOOLA_SSO___PRIVATE_KEY_ID_...`), not
+`GOOGLE_SERVICE_ACCOUNT_KEY`, and there is no `group_auth.py` /
+`before_request` gate anywhere in the app's repo at all. Net effect: any
+Google account can log in, no group restriction actually applies, despite
+the app looking gated. Not fixed as part of the 2026-09-30 contact-line pass
+(out of scope — flagging for a follow-up: redo step 5 + step 6 properly on
+this app).
+
+### 9. Nested groups need the service account's permission on EVERY level, not just the top group
+
+**Symptom:** app shows the 500 "Chyba při ověřování přístupu. Zkuste to
+prosím později." page for everyone (not the 403 "not a member" page), even
+for users who should be in the allowed group. Logs show a 403 from
+`cloudidentity.googleapis.com` on `memberships:checkTransitiveMembership`:
+
+```
+Error(2028): Permission denied for resource <nested-group>@economia.cz (or it may not exist).
+```
+
+Seen 2026-10-01 on Subscription Command Center: `ALLOWED_GROUP` is
+`dataapps_product@economia.cz`, but that group has `analyticky.tym@economia.cz`
+nested as a member. `checkTransitiveMembership` has to walk into every nested
+group to resolve the chain, and the service account was only ever granted
+Manager on the top-level group (per step 2) — not on the group nested inside
+it. Google Cloud Identity Groups API requires the caller to have read access
+on each group in the transitive chain, so the walk 403s as soon as it hits
+the unauthorized nested group, even though the service account's own
+top-level membership is fine.
+
+**Fix:** grant `keboola-group-check@keboola-sso.iam.gserviceaccount.com`
+Manager (or Member, Viewer may not be enough — test) on the nested group too
+— here, `analyticky.tym@economia.cz`. If `ALLOWED_GROUP`/`REQUIRED_GROUP_EMAIL`
+nests other groups, every one of them needs the same grant. Ask whoever owns
+Google Groups admin (Radek) which groups are nested before assuming a
+single-group fix is enough.
 
 ## Handy links
 

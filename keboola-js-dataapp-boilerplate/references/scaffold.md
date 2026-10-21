@@ -30,7 +30,7 @@ Everything you need to run `npm install && npm run build && node dist/server/ind
 └── src/
     ├── main.tsx
     ├── App.tsx
-    ├── StoryPage.tsx            # optional; see design skill
+    ├── StoryPage.tsx            # only if Story mode is requested; see design skill
     ├── AskKaiPage.tsx
     ├── DocumentationPage.tsx
     ├── index.css

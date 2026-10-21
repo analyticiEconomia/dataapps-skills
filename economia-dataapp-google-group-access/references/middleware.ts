@@ -109,7 +109,7 @@ app.use(async (req, res, next) => {
   try {
     const member = await isMemberOfAnyGroup(email, allowedGroups);
     if (!member) {
-      res.status(403).send(accessDeniedPage(`Tento report je dostupný jen pro členy skupiny ${allowedGroups.join(' / ')}.`));
+      res.status(403).send(accessDeniedPage(`Tento report je dostupný jen pro členy skupiny ${allowedGroups.join(' / ')}. Pokud si myslíte, že byste přístup mít měli, napište na vit.svoboda@economia.cz nebo pavel.stepanek@economia.cz.`));
       return;
     }
   } catch (err) {
