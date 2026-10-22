@@ -31,6 +31,10 @@ Visual system: two report modes with a first-load selector, mandatory Documentat
 - `references/chart-explainer.md` — good/bad copy examples for the chart explainers
 - `references/required-pages.md` — Documentation (first tab) + Ask Kai (last tab) templates
 - `references/copy-guide.md` — voice, tone, terminology template (per-app glossary)
+- `references/theme-toggle.md` — light/dark toggle (Economia reports start light)
+- `references/back-navigation.md` — icon-only back („Zpět“) button on `window.history`
+- `references/export-download.md` — CSV / PNG / PDF download menu
+- `references/economia-branding.md` + `assets/` — Economia „e.“ mark, wordmark, favicon
 
 ### [`economia-dataapp-google-group-access/`](./economia-dataapp-google-group-access)
 

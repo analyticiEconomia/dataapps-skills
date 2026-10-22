@@ -1,14 +1,14 @@
 ---
 name: keboola-js-dataapp-design
-description: Design system + component library for Keboola JS data apps built with React + Vite + TypeScript. Ships two report modes — Classic (tabbed report for analytical work) and Story (single-scroll narrative for board presentations) — with a mode selector on first load. Enforces the rules that make a data app immediately usable — Documentation as the first page, Ask Kai as the last, and every chart wrapped in a "how to read + where the number comes from" explainer in plain language (not SQL). Provides the CSS design tokens, InsightCard / HeroKpi / DataTable / ChartExplainer components, and dramaturgical structure for the Story mode. Includes a light/dark theme toggle (dark by default) driven by CSS variables. Trigger phrases — "design a Keboola data app", "add dark mode / light mode toggle", "světlý / tmavý režim", "add a story mode", "make the report look premium", "why is my chart missing an explainer", "board-ready dashboard". Companion skill — `keboola-js-dataapp-boilerplate` for infrastructure, server, and Kai integration.
+description: Design system + component library for Keboola JS data apps built with React + Vite + TypeScript. Ships two report modes — Classic (tabbed report for analytical work) and Story (single-scroll narrative for board presentations) — with a mode selector on first load. Enforces the rules that make a data app immediately usable — Documentation as the first page, Ask Kai as the last, and every chart wrapped in a "how to read + where the number comes from" explainer in plain language (not SQL). Provides the CSS design tokens, InsightCard / HeroKpi / DataTable / ChartExplainer components, and dramaturgical structure for the Story mode. Includes a light/dark theme toggle driven by CSS variables (Economia reports start light; dark is one click away), plus the Economia house standards: „e.“ logo, icon-only back button, CSV/PNG/PDF export menu. Trigger phrases — "design a Keboola data app", "add dark mode / light mode toggle", "světlý / tmavý režim", "add a story mode", "make the report look premium", "why is my chart missing an explainer", "board-ready dashboard". Companion skill — `keboola-js-dataapp-boilerplate` for infrastructure, server, and Kai integration.
 metadata:
-  version: "1.1.0"
+  version: "1.2.0"
   author: pstepanek
 ---
 
 # Keboola JS Data App — Design
 
-**What this produces:** a premium-feel React data app (dark by default, with a light/dark toggle in the sidebar) with a mode selector on first load (Classic tabs vs Story scroll), enforced Documentation and Ask Kai tabs, animated hero KPIs, and every chart accompanied by a "how to read" explainer that reads like a caption in a newspaper — not like SQL.
+**What this produces:** a premium-feel React data app (light by default for Economia reports, with a light/dark toggle in the sidebar) with a mode selector on first load (Classic tabs vs Story scroll), enforced Documentation and Ask Kai tabs, animated hero KPIs, and every chart accompanied by a "how to read" explainer that reads like a caption in a newspaper — not like SQL.
 
 **Requires:** the infrastructure skeleton from `keboola-js-dataapp-boilerplate`. This skill is the layer on top.
 
@@ -38,6 +38,9 @@ metadata:
 - `references/mode-selector.md` — landing screen code + localStorage handling.
 - `references/copy-guide.md` — voice, tone, and terminology (Czech + English variants).
 - `references/theme-toggle.md` — light/dark toggle: Tailwind `slate` remap to CSS variables, `text-ink`, Recharts grid/tooltip, button + no-flash script, verification.
+- `references/back-navigation.md` — icon-only back („Zpět“) button on `window.history`: rules, React drop-in, vanilla-JS variant, verification.
+- `references/economia-branding.md` — the Economia „e.“ mark, wordmark and favicon (`assets/`): where they go, code, don'ts.
+- `references/export-download.md` — CSV / PNG / PDF download menu: code (vanilla JS, React, Streamlit) and gotchas.
 
 ## The design tokens (short version)
 
@@ -77,6 +80,22 @@ Cover → Documentation (opening chapter, condensed) → Chapter 1 → … → R
 ```
 Full-viewport chapters, right-side progress dots, scroll-triggered animations. See `references/story-mode.md` for the dramaturgical arc pattern, and `references/mode-selector.md` for wiring the landing screen + `localStorage` persistence once Story is actually requested.
 
+## Export menu (CSV / PNG / PDF) — standard on every report
+
+Every report app ships a download control: one icon button (download glyph, not a bare arrow) in the header, opening a small dropdown with plain-text options `CSV`, `PNG`, `PDF` — no emoji, no extra wording. CSV exports the currently rendered/filtered tab's data (UTF-8 BOM, semicolons, decimal comma for Czech Excel); PNG/PDF rasterize the active view via `html2canvas` (+ `jspdf` for PDF). Full pattern, code and gotchas (dropdown visibility, wide-table clipping, icon-button busy state) are in `references/export-download.md`.
+
+## Back button („Zpět“) — standard on every report
+
+Every report app ships an **icon-only back button** in the header, left of refresh and download (header controls order: **back · refresh · download**). It returns to the previous view — page/tab, drilled-in item, date/period and header filters — and the browser's back button does the same, because it is built on `window.history` (`pushState`/`popstate`). Lucide `Undo2` icon, `icon-btn` class, `title`/`aria-label` „Zpět na předchozí pohled“, disabled on the first view. No text label on the button. Rules, React drop-in code, a vanilla-JS variant for Flask apps and the verification steps: `references/back-navigation.md`.
+
+## Economia house standards
+
+Requested by the Economia analytics team for every report app:
+- **Light by default.** Economia reports open in the light theme; the sidebar ☀/☾ toggle (`references/theme-toggle.md`) still offers dark and remembers the choice. Set `DEFAULT_THEME = 'light'` in `src/theme.ts` and the no-flash script. An app that already shipped dark before the toggle existed may keep `'dark'` so its users see no change.
+- **Economia light palette** in the `[data-theme="light"]` block: page background flat `#f7f8fa` (`--page-bg: #f7f8fa;`), cards/panels white, borders and `--hairline` `#e2e5ea`, body text `#1c2430` (`--ink: 28 36 48;`), muted text `#6b7686`, accent `#d6002a` (+ soft `#fdecef`) for the active nav item, active filters and links. Semantic chart colours stay, in shades that read on white.
+- **Economia logo** — black „e.“ mark (`assets/economia-e.png`, white variant for dark backgrounds) next to the app name in the top-left of the sidebar, on top of PNG/PDF exports (hidden `.export-only` strip revealed in html2canvas `onclone`), and `assets/favicon.png` as the favicon. See `references/economia-branding.md`.
+- **Header controls** — back (`references/back-navigation.md`) · refresh · download (`references/export-download.md`), all icon-only `icon-btn`s.
+
 ## The `<ChartExplainer>` rule
 
 **Every chart, no exception:**
@@ -113,6 +132,9 @@ See `references/chart-explainer.md` for good vs bad examples.
 - [ ] Every LIMITed pre-agg table has either a KPI count exposing the true total, OR a caveat in the ChartExplainer
 - [ ] Tabular numbers use `font-variant-numeric: tabular-nums`
 - [ ] `Inter` font is loaded (Google Fonts) and used everywhere
-- [ ] Dark background is the radial-gradient combo, not `#000` or `#111`
-- [ ] Light/dark toggle present in the sidebar header, dark by default, choice survives reload (`references/theme-toggle.md`)
+- [ ] In dark mode the background is the radial-gradient combo, not `#000` or `#111`; in light mode (Economia) it is flat `#f7f8fa`
+- [ ] Light/dark toggle present in the sidebar header, **light by default** for Economia reports (dark only for apps that were already dark), choice survives reload (`references/theme-toggle.md`)
+- [ ] Export menu present (download icon → CSV / PNG / PDF), reflects current filters, dropdown closes on outside click/Escape (`references/export-download.md`)
+- [ ] Back button present (icon-only `Undo2`, left of refresh/download), disabled on first view, steps back through page / drill / date / filters, browser back behaves the same (`references/back-navigation.md`)
+- [ ] Economia „e.“ logo in the sidebar next to the app name, on PNG/PDF exports, favicon set (`references/economia-branding.md`)
 - [ ] Checked in light mode after a full reload: chart grid light, tooltip light, no white-on-white text (`text-white` only on solid colour backgrounds, else `text-ink`)

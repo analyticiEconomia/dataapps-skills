@@ -183,6 +183,16 @@ Add both `"google-auth>=2.30.0"` **and** `"requests>=2.31.0"` to
 `pyproject.toml` `dependencies` — see Gotcha 6, this is the one step that's
 easy to get wrong porting the JS version by hand.
 
+**The code gate is mandatory, in the same change that builds the app.** The
+Keboola OIDC setting + the two variables alone restrict nothing — OIDC only
+means "any Google login". Ship the middleware with the app and tell the owner
+which two variables to add by hand (two separate rows in Secrets).
+
+Debugging: `Expecting value: line 1 column 1` in the logs means
+`GOOGLE_SERVICE_ACCOUNT_KEY` is empty / not valid JSON (re-paste the whole
+JSON); denied right after being added to a group is the membership cache /
+Google propagation — wait ~1 min.
+
 ### 7. Ship
 
 ```bash

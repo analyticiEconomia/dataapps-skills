@@ -1,8 +1,14 @@
 # Light / dark theme toggle
 
-Every report ships with a ☀/☾ toggle in the sidebar header. Default stays
-**dark** (the original look, so existing users see no change until they
-click). The choice is remembered per browser in `localStorage`.
+Every report ships with a ☀/☾ toggle in the sidebar header. The choice is
+remembered per browser in `localStorage`.
+
+**Default theme:** Economia reports open in **light** (house standard since
+2026-10-22, see SKILL.md → Economia house standards). An app that already
+shipped dark before the toggle existed may keep `DEFAULT_THEME = 'dark'`, so
+its users see no change until they click. The default lives in exactly two
+places — `src/theme.ts` and the no-flash script in `index.html` — keep them
+in sync.
 
 Proven on "Yield Reports" (project 708, config `01m3rrha312nvcxp6fz9d0hwfk`),
 2026-10-21: converting the whole app touched ~12 lines of TSX. Nearly all
@@ -120,9 +126,12 @@ import { useEffect, useState } from 'react';
 // before first paint (no flash); colours themselves are CSS variables in index.css.
 export type Theme = 'dark' | 'light';
 const KEY = '<app-slug>-theme';
+// Economia reports start light; use 'dark' only for an app that already shipped dark.
+export const DEFAULT_THEME: Theme = 'light';
 
 function current(): Theme {
-  return document.documentElement.dataset.theme === 'light' ? 'light' : 'dark';
+  const t = document.documentElement.dataset.theme;
+  return t === 'dark' || t === 'light' ? t : DEFAULT_THEME;
 }
 
 export function useTheme(): [Theme, () => void] {
@@ -141,15 +150,16 @@ export function useTheme(): [Theme, () => void] {
 
 ## 6. `index.html` — apply before first paint
 
-Without this the page renders dark for a frame and then flashes to light.
+Without this the page renders in the wrong theme for a frame and then flashes.
 
 ```html
 <script>
-  // Apply the saved theme before first paint (default: dark). See src/theme.ts.
+  // Apply the saved theme before first paint (default: light, = DEFAULT_THEME in src/theme.ts).
   try {
-    document.documentElement.dataset.theme = localStorage.getItem('<app-slug>-theme') === 'light' ? 'light' : 'dark';
+    var saved = localStorage.getItem('<app-slug>-theme');
+    document.documentElement.dataset.theme = saved === 'dark' || saved === 'light' ? saved : 'light';
   } catch (e) {
-    document.documentElement.dataset.theme = 'dark';
+    document.documentElement.dataset.theme = 'light';
   }
 </script>
 ```
@@ -187,5 +197,6 @@ const [theme, toggleTheme] = useTheme();
 - Computed-style spot check in the console:
   `getComputedStyle(document.querySelector('.recharts-cartesian-grid line')).stroke`
   → `rgb(226, 232, 240)` in light, `rgb(30, 41, 59)` in dark.
-- Toggle back to dark and confirm it looks identical to before the change.
+- Toggle to dark and back and confirm both look right (for a retrofitted app
+  that was dark before: dark must look identical to before the change).
 - Reload: the choice must survive (`localStorage['<app-slug>-theme']`).
