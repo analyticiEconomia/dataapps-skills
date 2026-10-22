@@ -1,7 +1,7 @@
 # Back button ("Zpět") — standard on every report
 
 Every report app has an **icon-only back button** in the header, in the same row as refresh and download
-(order: back · refresh · download). It returns to the **previous view of the report**: page/tab, drilled-in
+(order: theme · back · refresh · download). It returns to the **previous view of the report**: page/tab, drilled-in
 item (e.g. selected organisation), date and all header filters. The browser's own back button must do the
 same thing.
 
@@ -92,7 +92,7 @@ useEffect(() => {
   return () => window.removeEventListener('popstate', onPop);
 }, []);
 
-// header, before refresh + ExportMenu:
+// header, after the theme toggle and before refresh + ExportMenu:
 <button
   className="icon-btn"
   title="Zpět na předchozí pohled"

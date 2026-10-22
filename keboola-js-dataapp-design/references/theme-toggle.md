@@ -1,7 +1,10 @@
 # Light / dark theme toggle
 
-Every report ships with a ☀/☾ toggle in the sidebar header. The choice is
-remembered per browser in `localStorage`.
+Every report ships with a ☀/☾ toggle as the **first icon of the header control
+row** (theme · back · refresh · download), always visible. The choice is
+remembered per browser in `localStorage`. Don't put it next to the app name in
+the sidebar — it competes with the title there (feedback from the Economia
+analytics team, 2026-10-22).
 
 **Default theme:** Economia reports open in **light** (house standard since
 2026-10-22, see SKILL.md → Economia house standards). An app that already
@@ -166,7 +169,7 @@ Without this the page renders in the wrong theme for a frame and then flashes.
 
 Use the same `<app-slug>-theme` key in both places.
 
-## 7. The button (sidebar header, `src/App.tsx`)
+## 7. The button (header control row, `src/App.tsx`)
 
 ```tsx
 import { Sun, Moon } from 'lucide-react';
@@ -174,16 +177,18 @@ import { useTheme } from './theme';
 
 const [theme, toggleTheme] = useTheme();
 
-<div className="px-5 py-5 border-b border-slate-800 flex items-start justify-between gap-3">
-  <div>{/* eyebrow + app title */}</div>
+// Header, right-aligned control row — theme first, then back, refresh, download (same icon-btn size):
+<div className="ml-auto flex items-center gap-3">
+  {/* …filters… */}
   <button
+    className="icon-btn"
     onClick={toggleTheme}
-    className="mt-1 rounded-lg border border-slate-700 p-2 text-slate-400 hover:text-ink hover:bg-slate-800/50 transition-colors"
     title={theme === 'dark' ? 'Přepnout na světlý režim' : 'Přepnout na tmavý režim'}
     aria-label={theme === 'dark' ? 'Přepnout na světlý režim' : 'Přepnout na tmavý režim'}
   >
     {theme === 'dark' ? <Sun size={15} /> : <Moon size={15} />}
   </button>
+  {/* back (references/back-navigation.md) · refresh · <ExportMenu /> */}
 </div>
 ```
 

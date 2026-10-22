@@ -1,6 +1,6 @@
 # Export / Download Menu (CSV, PNG, PDF)
 
-> **Header companion — back button:** every report also gets an icon-only back button ("Zpět", lucide `Undo2`) left of refresh and the download icon, built on `window.history`. Rules + code: `references/back-navigation.md`.
+> **Header companion — back button:** every report also gets an icon-only back button ("Zpět", lucide `Undo2`) between the theme toggle and refresh/download (order: theme · back · refresh · download), built on `window.history`. Rules + code: `references/back-navigation.md`.
 
 
 **Use this when:** building or migrating any dashboard-style data app (Streamlit or Python/JS). This is a **standard feature for every report app**, not an opt-in extra — add it by default the same way you add loading/error states.
