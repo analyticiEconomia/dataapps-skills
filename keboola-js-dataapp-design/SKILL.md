@@ -2,7 +2,7 @@
 name: keboola-js-dataapp-design
 description: Design system + component library for Keboola JS data apps built with React + Vite + TypeScript. Ships two report modes — Classic (tabbed report for analytical work) and Story (single-scroll narrative for board presentations) — with a mode selector on first load. Enforces the rules that make a data app immediately usable — Documentation as the first page, Ask Kai as the last, and every chart wrapped in a "how to read + where the number comes from" explainer in plain language (not SQL). Provides the CSS design tokens, InsightCard / HeroKpi / DataTable / ChartExplainer components, and dramaturgical structure for the Story mode. Includes a light/dark theme toggle driven by CSS variables (Economia reports start light; dark is one click away), plus the Economia house standards: „e.“ logo, icon-only back button, CSV/PNG/PDF export menu. Trigger phrases — "design a Keboola data app", "add dark mode / light mode toggle", "světlý / tmavý režim", "add a story mode", "make the report look premium", "why is my chart missing an explainer", "board-ready dashboard". Companion skill — `keboola-js-dataapp-boilerplate` for infrastructure, server, and Kai integration.
 metadata:
-  version: "1.2.1"
+  version: "1.3.0"
   author: pstepanek
 ---
 
@@ -41,6 +41,7 @@ metadata:
 - `references/back-navigation.md` — icon-only back („Zpět“) button on `window.history`: rules, React drop-in, vanilla-JS variant, verification.
 - `references/economia-branding.md` — the Economia „e.“ mark, wordmark and favicon (`assets/`): where they go, code, don'ts.
 - `references/export-download.md` — CSV / PNG / PDF download menu: code (vanilla JS, React, Streamlit) and gotchas.
+- `references/period-picker.md` — date-range filter „Vybrané období“: header button + popover (Od/Do, presets incl. Minulý měsíc), React drop-in, vanilla-JS pointer.
 
 ## The design tokens (short version)
 
@@ -95,6 +96,7 @@ Requested by the Economia analytics team for every report app:
 - **Economia light palette** in the `[data-theme="light"]` block: page background flat `#f7f8fa` (`--page-bg: #f7f8fa;`), cards/panels white, borders and `--hairline` `#e2e5ea`, body text `#1c2430` (`--ink: 28 36 48;`), muted text `#6b7686`, accent `#d6002a` (+ soft `#fdecef`) for the active nav item, active filters and links. Semantic chart colours stay, in shades that read on white.
 - **Economia logo** — black „e.“ mark (`assets/economia-e.png`, white variant for dark backgrounds) next to the app name in the top-left of the sidebar, on top of PNG/PDF exports (hidden `.export-only` strip revealed in html2canvas `onclone`), and `assets/favicon.png` as the favicon. See `references/economia-branding.md`.
 - **Header controls** — theme ☀/☾ (`references/theme-toggle.md`) · back (`references/back-navigation.md`) · refresh · download (`references/export-download.md`), all icon-only `icon-btn`s of the same size, always visible. The sidebar header holds only the logo, app name and subtitle.
+- **Date range = period picker** — one header button (`📅 1. 10. 2026 – 31. 10. 2026 ⌄`) opening a popover with Od/Do inputs, „Data k dispozici“ and presets Celé období · Posledních 30 dní · Posledních 90 dní · Tento měsíc · Minulý měsíc · Letos, counted from the last day with data. Never two bare date inputs in the header. See `references/period-picker.md`.
 
 ## The `<ChartExplainer>` rule
 
@@ -136,5 +138,6 @@ See `references/chart-explainer.md` for good vs bad examples.
 - [ ] Light/dark toggle present as the first icon of the header control row (theme · back · refresh · download), **light by default** for Economia reports (dark only for apps that were already dark), choice survives reload (`references/theme-toggle.md`)
 - [ ] Export menu present (download icon → CSV / PNG / PDF), reflects current filters, dropdown closes on outside click/Escape (`references/export-download.md`)
 - [ ] Back button present (icon-only `Undo2`, between the theme toggle and refresh/download), disabled on first view, steps back through page / drill / date / filters, browser back behaves the same (`references/back-navigation.md`)
+- [ ] Date range filter is the period picker (button + popover, six presets incl. Minulý měsíc) (`references/period-picker.md`)
 - [ ] Economia „e.“ logo in the sidebar next to the app name, on PNG/PDF exports, favicon set (`references/economia-branding.md`)
 - [ ] Checked in light mode after a full reload: chart grid light, tooltip light, no white-on-white text (`text-white` only on solid colour backgrounds, else `text-ink`)
